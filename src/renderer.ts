@@ -104,9 +104,17 @@ function renderComplexPath(
 ): void {
   const resolution = options?.curveResolution ?? 32
 
-  // We need to split into subpaths (each starting with M) and render each.
-  // Phaser.Curves.Path draws open/closed polylines from its curves.
+  // Tessellate each subpath into polylines first so we can draw them
+  // in a single beginPath / fillPath call.  This preserves the winding
+  // rule so that overlapping subpaths create holes (e.g. ring shapes).
   const subpaths = splitSubpaths(commands)
+
+  interface TessellatedSubpath {
+    points: Phaser.Math.Vector2[]
+    closed: boolean
+  }
+
+  const tessellated: TessellatedSubpath[] = []
 
   for (const subpath of subpaths) {
     if (subpath.length === 0) continue
@@ -121,7 +129,6 @@ function renderComplexPath(
       const cmd = assertDefined(subpath[i], `Expected command at index ${i}`)
       switch (cmd.type) {
         case "M":
-          // Shouldn't happen inside a subpath, but move the path
           phaserPath.moveTo(cmd.x, cmd.y)
           break
         case "L":
@@ -143,28 +150,41 @@ function renderComplexPath(
       }
     }
 
-    // Draw the Phaser path as a polyline on the Graphics object
     const points = phaserPath.getPoints(resolution)
     if (closed && points.length > 0) {
       points.push(assertDefined(points[0]))
     }
 
     if (points.length > 1) {
-      applyStyles(graphics, style, fillAlpha, strokeAlpha)
-      const start = assertDefined(points[0])
-      graphics.beginPath()
-      graphics.moveTo(start.x, start.y)
-      for (let j = 1; j < points.length; j++) {
-        const pt = assertDefined(points[j])
-        graphics.lineTo(pt.x, pt.y)
-      }
-      if (closed) {
-        graphics.closePath()
-      }
-      applyFillAndStroke(graphics, style, fillAlpha, strokeAlpha)
-      const joinPoints = closed ? points.slice(0, -1) : points
-      drawLineJoins(graphics, joinPoints, closed, style, strokeAlpha)
+      tessellated.push({ points, closed })
     }
+  }
+
+  if (tessellated.length === 0) return
+
+  // Draw all subpaths in a single beginPath so the fill winding rule
+  // correctly creates holes where subpaths overlap.
+  applyStyles(graphics, style, fillAlpha, strokeAlpha)
+  graphics.beginPath()
+
+  for (const { points, closed } of tessellated) {
+    const start = assertDefined(points[0])
+    graphics.moveTo(start.x, start.y)
+    for (let j = 1; j < points.length; j++) {
+      const pt = assertDefined(points[j])
+      graphics.lineTo(pt.x, pt.y)
+    }
+    if (closed) {
+      graphics.closePath()
+    }
+  }
+
+  applyFillAndStroke(graphics, style, fillAlpha, strokeAlpha)
+
+  // Line joins / caps per subpath
+  for (const { points, closed } of tessellated) {
+    const joinPoints = closed ? points.slice(0, -1) : points
+    drawLineJoins(graphics, joinPoints, closed, style, strokeAlpha)
   }
 }
 
