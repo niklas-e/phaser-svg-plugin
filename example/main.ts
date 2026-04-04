@@ -12,6 +12,7 @@ import smoothCubicSvg from "./svg/smooth-cubic.svg?raw"
 import smoothQuadraticSvg from "./svg/smooth-quadratic.svg?raw"
 import relativeSvg from "./svg/relative.svg?raw"
 import hvRectSvg from "./svg/hv-rect.svg?raw"
+import trufflecoreLogo from "./svg/trufflecore-logo.svg?raw"
 
 function assertDefined<T>(value: T | null | undefined): T {
   if (value == null) {
@@ -28,6 +29,7 @@ interface TestCase {
 }
 
 const testCases: TestCase[] = [
+  { title: "Complex shape", svg: trufflecoreLogo, width: 200, height: 100 },
   { title: "Triangle (M / L / Z)", svg: triangleSvg, width: 120, height: 100 },
   { title: "Cubic Bézier (C)", svg: cubicBezierSvg, width: 120, height: 100 },
   {
@@ -103,7 +105,7 @@ for (const tc of testCases) {
       create() {
         const g = this.add.graphics()
         g.setScale(dpr)
-        drawSVG(g, svg)
+        drawSVG(g, svg, { width: logicalW, height: logicalH })
       }
     }
 
