@@ -70,4 +70,19 @@ describe("resolveStyle", () => {
     const style = resolveStyle({ "stroke-linecap": "invalid" })
     assert.equal(style.lineCap, "butt")
   })
+
+  it("defaults miterLimit to 4", () => {
+    const style = resolveStyle({})
+    assert.equal(style.miterLimit, 4)
+  })
+
+  it("parses stroke-miterlimit", () => {
+    const style = resolveStyle({ "stroke-miterlimit": "8" })
+    assert.equal(style.miterLimit, 8)
+  })
+
+  it("ignores stroke-miterlimit below 1", () => {
+    const style = resolveStyle({ "stroke-miterlimit": "0.5" })
+    assert.equal(style.miterLimit, 4)
+  })
 })

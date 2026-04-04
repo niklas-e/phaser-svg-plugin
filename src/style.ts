@@ -55,6 +55,14 @@ export function resolveStyle(attrs: Record<string, string>): SVGStyle {
     style.lineCap = lineCap
   }
 
+  const miterLimit = attrs["stroke-miterlimit"]
+  if (miterLimit !== undefined) {
+    const parsed = Number(miterLimit)
+    if (parsed >= 1) {
+      style.miterLimit = parsed
+    }
+  }
+
   const opacity = attrs.opacity
   if (opacity !== undefined) {
     style.opacity = Number(opacity)

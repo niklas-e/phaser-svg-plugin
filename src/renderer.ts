@@ -1,7 +1,11 @@
 import Phaser from "phaser"
 import { assertDefined } from "./assert.ts"
 import { computeSquareCap } from "./line-cap.ts"
-import { computeBevelJoin, type Point2D } from "./line-join.ts"
+import {
+  computeBevelJoin,
+  computeMiterJoin,
+  type Point2D,
+} from "./line-join.ts"
 import type { PathCommand, SVGStyle } from "./types.ts"
 
 export interface RenderOptions {
@@ -390,7 +394,10 @@ function drawLineJoins(
 
   const n = points.length
   const hw = style.strokeWidth / 2
-  const needsJoins = style.lineJoin === "round" || style.lineJoin === "bevel"
+  const needsJoins =
+    style.lineJoin === "round" ||
+    style.lineJoin === "bevel" ||
+    style.lineJoin === "miter"
   const needsCaps =
     !closed && (style.lineCap === "round" || style.lineCap === "square")
   if (!needsJoins && !needsCaps) return
@@ -410,13 +417,26 @@ function drawLineJoins(
 
       if (style.lineJoin === "round") {
         graphics.fillCircle(curr.x, curr.y, hw)
-      } else {
+      } else if (style.lineJoin === "bevel") {
         const bevel = computeBevelJoin(prev, curr, next, hw)
         if (bevel) {
           graphics.beginPath()
           graphics.moveTo(curr.x, curr.y)
           graphics.lineTo(bevel[0].x, bevel[0].y)
           graphics.lineTo(bevel[1].x, bevel[1].y)
+          graphics.closePath()
+          graphics.fillPath()
+        }
+      } else {
+        const result = computeMiterJoin(prev, curr, next, hw, style.miterLimit)
+        if (result) {
+          graphics.beginPath()
+          graphics.moveTo(curr.x, curr.y)
+          graphics.lineTo(result.bevel[0].x, result.bevel[0].y)
+          if (result.miter) {
+            graphics.lineTo(result.miter.x, result.miter.y)
+          }
+          graphics.lineTo(result.bevel[1].x, result.bevel[1].y)
           graphics.closePath()
           graphics.fillPath()
         }

@@ -32,6 +32,7 @@ export interface SVGStyle {
   strokeWidth: number
   lineJoin: "miter" | "round" | "bevel"
   lineCap: "butt" | "round" | "square"
+  miterLimit: number
   opacity: number
 }
 
@@ -43,5 +44,6 @@ export const DEFAULT_STYLE: SVGStyle = {
   strokeWidth: 1,
   lineJoin: "miter",
   lineCap: "butt",
+  miterLimit: 4,
   opacity: 1,
 }
