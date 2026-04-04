@@ -47,3 +47,10 @@ export const DEFAULT_STYLE: SVGStyle = {
   miterLimit: 4,
   opacity: 1,
 }
+
+export interface ViewBox {
+  minX: number
+  minY: number
+  width: number
+  height: number
+}

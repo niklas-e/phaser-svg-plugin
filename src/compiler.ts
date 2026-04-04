@@ -1,6 +1,6 @@
 import { parsePath } from "./path-parser.ts"
 import { resolveStyle } from "./style.ts"
-import type { PathCommand, SVGStyle } from "./types.ts"
+import type { PathCommand, SVGStyle, ViewBox } from "./types.ts"
 
 /** A pre-compiled SVG path: parsed commands with resolved style. */
 export interface CompiledPath {
@@ -9,7 +9,10 @@ export interface CompiledPath {
 }
 
 /** Pre-compiled SVG ready for rendering without runtime parsing. */
-export type CompiledSVG = CompiledPath[]
+export interface CompiledSVG {
+  viewBox: ViewBox | null
+  paths: CompiledPath[]
+}
 
 /**
  * Compile an SVG string into pre-parsed path commands and styles.
@@ -19,8 +22,9 @@ export type CompiledSVG = CompiledPath[]
  * `drawCompiledSVG()`.
  */
 export function compileSVG(svgString: string): CompiledSVG {
+  const viewBox = extractViewBox(svgString) ?? null
   const pathElements = extractPathElements(svgString)
-  const result: CompiledSVG = []
+  const paths: CompiledPath[] = []
 
   for (const attrs of pathElements) {
     const d = attrs.d
@@ -28,10 +32,10 @@ export function compileSVG(svgString: string): CompiledSVG {
 
     const style = resolveStyle(attrs)
     const commands = parsePath(d)
-    result.push({ commands, style })
+    paths.push({ commands, style })
   }
 
-  return result
+  return { viewBox, paths }
 }
 
 /**
@@ -61,4 +65,30 @@ function extractPathElements(svgString: string): Record<string, string>[] {
   }
 
   return paths
+}
+
+function extractViewBox(svgString: string): ViewBox | undefined {
+  const match = svgString.match(/<svg\s[^>]*viewBox\s*=\s*["']([^"']*)["']/i)
+  if (!match?.[1]) return undefined
+
+  const parts = match[1].trim().split(/[\s,]+/)
+  if (parts.length !== 4) return undefined
+
+  const minX = Number(parts[0])
+  const minY = Number(parts[1])
+  const width = Number(parts[2])
+  const height = Number(parts[3])
+
+  if (
+    !Number.isFinite(minX) ||
+    !Number.isFinite(minY) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return undefined
+  }
+
+  return { minX, minY, width, height }
 }

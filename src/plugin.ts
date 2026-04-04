@@ -4,13 +4,18 @@ import type { CompiledSVG } from "./compiler.ts"
 import { parsePath } from "./path-parser.ts"
 import { type RenderOptions, renderPath } from "./renderer.ts"
 import { resolveStyle } from "./style.ts"
-import type { SVGStyle } from "./types.ts"
+import { transformCommands, viewBoxTransform } from "./transform.ts"
+import type { SVGStyle, ViewBox } from "./types.ts"
 
 export interface SVGPluginOptions extends RenderOptions {
   /** Override fill color for all elements. */
   overrideFill?: number | undefined
   /** Override stroke color for all elements. */
   overrideStroke?: number | undefined
+  /** Target width — scales the SVG viewBox to fit. */
+  width?: number | undefined
+  /** Target height — scales the SVG viewBox to fit. */
+  height?: number | undefined
 }
 
 /**
@@ -39,6 +44,11 @@ export function drawSVG(
 ): void {
   const parser = new DOMParser()
   const doc = parser.parseFromString(svgString, "image/svg+xml")
+
+  const svgEl = doc.documentElement
+  const viewBox = parseViewBox(svgEl.getAttribute("viewBox"))
+  const transform = computeTransform(viewBox, options)
+
   const paths = doc.querySelectorAll("path")
 
   for (const pathEl of paths) {
@@ -59,7 +69,18 @@ export function drawSVG(
       style.stroke = options.overrideStroke
     }
 
-    const commands = parsePath(d)
+    let commands = parsePath(d)
+
+    if (transform) {
+      commands = transformCommands(
+        commands,
+        transform.scale,
+        transform.tx,
+        transform.ty,
+      )
+      style.strokeWidth *= transform.scale
+    }
+
     renderPath(graphics, commands, style, options)
   }
 }
@@ -75,14 +96,27 @@ export function drawCompiledSVG(
   compiled: CompiledSVG,
   options?: SVGPluginOptions | undefined,
 ): void {
-  for (const { commands, style } of compiled) {
-    const resolved = { ...style }
+  const transform = computeTransform(compiled.viewBox, options)
+
+  for (const { commands: rawCmds, style: rawStyle } of compiled.paths) {
+    const resolved = { ...rawStyle }
 
     if (options?.overrideFill !== undefined) {
       resolved.fill = options.overrideFill
     }
     if (options?.overrideStroke !== undefined) {
       resolved.stroke = options.overrideStroke
+    }
+
+    let commands = rawCmds
+    if (transform) {
+      commands = transformCommands(
+        commands,
+        transform.scale,
+        transform.tx,
+        transform.ty,
+      )
+      resolved.strokeWidth *= transform.scale
     }
 
     renderPath(graphics, commands, resolved, options)
@@ -178,4 +212,43 @@ export class SVGPlugin extends Phaser.Plugins.ScenePlugin {
   destroy(): void {
     super.destroy()
   }
+}
+
+function parseViewBox(raw: string | null | undefined): ViewBox | undefined {
+  if (!raw) return undefined
+  const parts = raw.trim().split(/[\s,]+/)
+  if (parts.length !== 4) return undefined
+
+  const minX = Number(parts[0])
+  const minY = Number(parts[1])
+  const width = Number(parts[2])
+  const height = Number(parts[3])
+
+  if (
+    !Number.isFinite(minX) ||
+    !Number.isFinite(minY) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return undefined
+  }
+
+  return { minX, minY, width, height }
+}
+
+function computeTransform(
+  viewBox: ViewBox | null | undefined,
+  options: SVGPluginOptions | undefined,
+): { scale: number; tx: number; ty: number } | undefined {
+  if (!viewBox) return undefined
+  if (options?.width === undefined && options?.height === undefined) {
+    return undefined
+  }
+
+  const targetW = options.width ?? options.height ?? viewBox.width
+  const targetH = options.height ?? options.width ?? viewBox.height
+
+  return viewBoxTransform(viewBox, targetW, targetH)
 }

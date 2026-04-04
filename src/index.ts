@@ -10,4 +10,9 @@ export {
 } from "./plugin.ts"
 export { type RenderOptions, renderPath } from "./renderer.ts"
 export { resolveStyle } from "./style.ts"
-export { DEFAULT_STYLE, type PathCommand, type SVGStyle } from "./types.ts"
+export {
+  DEFAULT_STYLE,
+  type PathCommand,
+  type SVGStyle,
+  type ViewBox,
+} from "./types.ts"
