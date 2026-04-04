@@ -1,4 +1,4 @@
-import Phaser from "phaser"
+import type Phaser from "phaser"
 import { assertDefined } from "./assert.ts"
 import { computeSquareCap } from "./line-cap.ts"
 import {
@@ -9,7 +9,7 @@ import {
 import type { PathCommand, SVGStyle } from "./types.ts"
 
 export interface RenderOptions {
-  /** Points per curve segment for tessellation (default 32). */
+  /** Points per curve segment for tessellation (default 16). */
   curveResolution?: number | undefined
 }
 
@@ -68,30 +68,66 @@ function renderSimplePath(
   fillAlpha: number,
   strokeAlpha: number,
 ): void {
-  applyStyles(graphics, style, fillAlpha, strokeAlpha)
-  graphics.beginPath()
+  // Split into subpaths for compound fill (handles holes via bridged polygons)
+  const subpaths = splitSubpaths(commands)
 
-  for (const cmd of commands) {
-    switch (cmd.type) {
-      case "M":
-        graphics.moveTo(cmd.x, cmd.y)
-        break
-      case "L":
-        graphics.lineTo(cmd.x, cmd.y)
-        break
-      case "Z":
-        graphics.closePath()
-        break
+  interface SimpleSubpath {
+    points: Point2D[]
+    closed: boolean
+  }
+
+  const tessellated: SimpleSubpath[] = []
+
+  for (const subpath of subpaths) {
+    const points: Point2D[] = []
+    let closed = false
+    for (const cmd of subpath) {
+      if (cmd.type === "Z") {
+        closed = true
+      } else if ("x" in cmd && "y" in cmd) {
+        points.push(cmd)
+      }
+    }
+    if (points.length > 0) {
+      tessellated.push({ points, closed })
     }
   }
 
-  applyFillAndStroke(graphics, style, fillAlpha, strokeAlpha)
-  const { vertices, closed } = verticesFromCommands(commands)
-  drawLineJoins(graphics, vertices, closed, style, strokeAlpha)
+  if (tessellated.length === 0) return
+
+  // Fill using bridged polygons so compound paths with holes
+  // render correctly under WebGL.
+  if (style.fill !== null && tessellated.some((s) => s.closed)) {
+    fillCompoundPath(graphics, tessellated, style, fillAlpha)
+  }
+
+  // Stroke each subpath
+  if (style.stroke !== null) {
+    graphics.lineStyle(style.strokeWidth, style.stroke, strokeAlpha)
+
+    for (const { points, closed } of tessellated) {
+      graphics.beginPath()
+      const start = assertDefined(points[0])
+      graphics.moveTo(start.x, start.y)
+      for (let j = 1; j < points.length; j++) {
+        const pt = assertDefined(points[j])
+        graphics.lineTo(pt.x, pt.y)
+      }
+      if (closed) {
+        graphics.closePath()
+      }
+      graphics.strokePath()
+    }
+  }
+
+  // Line joins / caps
+  for (const { points, closed } of tessellated) {
+    drawLineJoins(graphics, points, closed, style, strokeAlpha)
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Complex path renderer — uses Phaser.Curves.Path for curves
+// Complex path renderer — manual curve tessellation for accurate output
 // ---------------------------------------------------------------------------
 
 function renderComplexPath(
@@ -102,122 +138,185 @@ function renderComplexPath(
   strokeAlpha: number,
   options?: RenderOptions | undefined,
 ): void {
-  const resolution = options?.curveResolution ?? 32
+  const resolution = options?.curveResolution ?? 16
 
-  // Tessellate each subpath into polylines first so we can draw them
-  // in a single beginPath / fillPath call.  This preserves the winding
-  // rule so that overlapping subpaths create holes (e.g. ring shapes).
-  const subpaths = splitSubpaths(commands)
+  const subpathCmds = splitSubpaths(commands)
 
   interface TessellatedSubpath {
-    points: Phaser.Math.Vector2[]
+    points: Point2D[]
     closed: boolean
   }
 
   const tessellated: TessellatedSubpath[] = []
 
-  for (const subpath of subpaths) {
+  for (const subpath of subpathCmds) {
     if (subpath.length === 0) continue
 
     const first = assertDefined(subpath[0], "Subpath must start with a command")
     if (first.type !== "M") continue
 
-    const phaserPath = new Phaser.Curves.Path(first.x, first.y)
+    const points: Point2D[] = [{ x: first.x, y: first.y }]
+    let cx = first.x
+    let cy = first.y
     let closed = false
 
     for (let i = 1; i < subpath.length; i++) {
       const cmd = assertDefined(subpath[i], `Expected command at index ${i}`)
       switch (cmd.type) {
         case "M":
-          phaserPath.moveTo(cmd.x, cmd.y)
+          cx = cmd.x
+          cy = cmd.y
+          points.push({ x: cx, y: cy })
           break
         case "L":
-          phaserPath.lineTo(cmd.x, cmd.y)
+          cx = cmd.x
+          cy = cmd.y
+          points.push({ x: cx, y: cy })
           break
         case "C":
-          phaserPath.cubicBezierTo(cmd.x, cmd.y, cmd.x1, cmd.y1, cmd.x2, cmd.y2)
+          tessellateCubic(
+            cx,
+            cy,
+            cmd.x1,
+            cmd.y1,
+            cmd.x2,
+            cmd.y2,
+            cmd.x,
+            cmd.y,
+            resolution,
+            points,
+          )
+          cx = cmd.x
+          cy = cmd.y
           break
         case "Q":
-          phaserPath.quadraticBezierTo(cmd.x, cmd.y, cmd.x1, cmd.y1)
+          tessellateQuadratic(
+            cx,
+            cy,
+            cmd.x1,
+            cmd.y1,
+            cmd.x,
+            cmd.y,
+            resolution,
+            points,
+          )
+          cx = cmd.x
+          cy = cmd.y
           break
-        case "A":
-          addArcToPath(phaserPath, subpath, i)
+        case "A": {
+          tessellateArc(cx, cy, cmd, resolution, points)
+          cx = cmd.x
+          cy = cmd.y
           break
+        }
         case "Z":
-          phaserPath.closePath()
           closed = true
           break
       }
     }
 
-    const points = phaserPath.getPoints(resolution)
-    if (closed && points.length > 0) {
-      points.push(assertDefined(points[0]))
-    }
-
-    if (points.length > 1) {
-      tessellated.push({ points, closed })
+    const deduped = deduplicatePoints(points)
+    if (deduped.length > 1) {
+      tessellated.push({ points: deduped, closed })
     }
   }
 
   if (tessellated.length === 0) return
 
-  // Draw all subpaths in a single beginPath so the fill winding rule
-  // correctly creates holes where subpaths overlap.
-  applyStyles(graphics, style, fillAlpha, strokeAlpha)
-  graphics.beginPath()
+  // Fill using bridged polygons so compound paths with holes render
+  // correctly (Phaser's WebGL pipeline doesn't honour winding rules).
+  if (style.fill !== null && tessellated.some((s) => s.closed)) {
+    fillCompoundPath(graphics, tessellated, style, fillAlpha)
+  }
 
-  for (const { points, closed } of tessellated) {
-    const start = assertDefined(points[0])
-    graphics.moveTo(start.x, start.y)
-    for (let j = 1; j < points.length; j++) {
-      const pt = assertDefined(points[j])
-      graphics.lineTo(pt.x, pt.y)
-    }
-    if (closed) {
-      graphics.closePath()
+  // Stroke: draw each subpath outline individually
+  if (style.stroke !== null) {
+    graphics.lineStyle(style.strokeWidth, style.stroke, strokeAlpha)
+
+    for (const { points, closed } of tessellated) {
+      graphics.beginPath()
+      const start = assertDefined(points[0])
+      graphics.moveTo(start.x, start.y)
+      for (let j = 1; j < points.length; j++) {
+        const pt = assertDefined(points[j])
+        graphics.lineTo(pt.x, pt.y)
+      }
+      if (closed) {
+        graphics.closePath()
+      }
+      graphics.strokePath()
     }
   }
 
-  applyFillAndStroke(graphics, style, fillAlpha, strokeAlpha)
-
   // Line joins / caps per subpath
   for (const { points, closed } of tessellated) {
-    const joinPoints = closed ? points.slice(0, -1) : points
-    drawLineJoins(graphics, joinPoints, closed, style, strokeAlpha)
+    drawLineJoins(graphics, points, closed, style, strokeAlpha)
   }
 }
 
 // ---------------------------------------------------------------------------
-// Arc conversion: SVG endpoint → Phaser.Curves.EllipseCurve
+// Manual curve tessellation — gives resolution points PER curve segment
 // ---------------------------------------------------------------------------
 
-function addArcToPath(
-  path: Phaser.Curves.Path,
-  commands: PathCommand[],
-  index: number,
+function tessellateCubic(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+  steps: number,
+  out: Point2D[],
 ): void {
-  const cmd = assertDefined(
-    commands[index],
-    `Expected command at index ${index}`,
-  )
-  if (cmd.type !== "A") return
-
-  // Find the previous endpoint (current point)
-  let px = 0
-  let py = 0
-  for (let j = index - 1; j >= 0; j--) {
-    const prev = assertDefined(commands[j])
-    if ("x" in prev && "y" in prev) {
-      px = prev.x
-      py = prev.y
-      break
-    }
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps
+    const mt = 1 - t
+    const mt2 = mt * mt
+    const t2 = t * t
+    const x = mt2 * mt * x0 + 3 * mt2 * t * x1 + 3 * mt * t2 * x2 + t2 * t * x3
+    const y = mt2 * mt * y0 + 3 * mt2 * t * y1 + 3 * mt * t2 * y2 + t2 * t * y3
+    out.push({ x, y })
   }
+}
 
-  const { startAngle, endAngle, rx, ry, clockwise } = endpointToCenter(
-    px,
-    py,
+function tessellateQuadratic(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  steps: number,
+  out: Point2D[],
+): void {
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps
+    const mt = 1 - t
+    const x = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2
+    const y = mt * mt * y0 + 2 * mt * t * y1 + t * t * y2
+    out.push({ x, y })
+  }
+}
+
+function tessellateArc(
+  cx: number,
+  cy: number,
+  cmd: Extract<PathCommand, { type: "A" }>,
+  steps: number,
+  out: Point2D[],
+): void {
+  const {
+    startAngle,
+    endAngle,
+    rx,
+    ry,
+    cx: arcCx,
+    cy: arcCy,
+  } = endpointToCenter(
+    cx,
+    cy,
     cmd.rx,
     cmd.ry,
     cmd.xAxisRotation,
@@ -227,16 +326,323 @@ function addArcToPath(
     cmd.y,
   )
 
-  // Phaser.Curves.EllipseCurve expects degrees
-  path.ellipseTo(
-    rx,
-    ry,
-    startAngle * (180 / Math.PI),
-    endAngle * (180 / Math.PI),
-    clockwise,
-    cmd.xAxisRotation,
+  const phiRad = (cmd.xAxisRotation * Math.PI) / 180
+  const cosPhi = Math.cos(phiRad)
+  const sinPhi = Math.sin(phiRad)
+  const dTheta = endAngle - startAngle
+
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps
+    const theta = startAngle + dTheta * t
+    const cosT = Math.cos(theta)
+    const sinT = Math.sin(theta)
+    const px = cosPhi * rx * cosT - sinPhi * ry * sinT + arcCx
+    const py = sinPhi * rx * cosT + cosPhi * ry * sinT + arcCy
+    out.push({ x: px, y: py })
+  }
+}
+
+/**
+ * Fill compound paths (with holes) by constructing bridged polygons.
+ *
+ * Phaser's WebGL FillPath renders each subpath independently through
+ * earcut without hole support. To produce correct fills for paths with
+ * holes we merge each outer ring with its holes into a single simple
+ * polygon by inserting bridge edges. The result is a single ring that
+ * Phaser can fill natively, eliminating triangulation seams entirely.
+ *
+ * A 1px stroke patch is drawn over each bridge slit to cover hairline
+ * rasterization cracks.
+ */
+function fillCompoundPath(
+  graphics: Phaser.GameObjects.Graphics,
+  subpaths: ReadonlyArray<{
+    points: ReadonlyArray<{ x: number; y: number }>
+    closed: boolean
+  }>,
+  style: SVGStyle,
+  fillAlpha: number,
+): void {
+  const closed = subpaths.filter((s) => s.closed)
+  if (closed.length === 0) return
+
+  const groups = groupSubpathsForFill(closed)
+
+  graphics.fillStyle(assertDefined(style.fill), fillAlpha)
+
+  for (const group of groups) {
+    if (group.holes.length === 0) {
+      graphics.beginPath()
+      const start = assertDefined(group.outer[0])
+      graphics.moveTo(start.x, start.y)
+      for (let j = 1; j < group.outer.length; j++) {
+        const pt = assertDefined(group.outer[j])
+        graphics.lineTo(pt.x, pt.y)
+      }
+      graphics.closePath()
+      graphics.fillPath()
+      continue
+    }
+
+    const result = buildBridgedPolygon(group.outer, group.holes)
+
+    graphics.beginPath()
+    const start = assertDefined(result.ring[0])
+    graphics.moveTo(start.x, start.y)
+    for (let j = 1; j < result.ring.length; j++) {
+      const pt = assertDefined(result.ring[j])
+      graphics.lineTo(pt.x, pt.y)
+    }
+    graphics.closePath()
+    graphics.fillPath()
+
+    // Patch hairline cracks along bridge slits by stroking a 1px line
+    // over each bridge edge. Unlike filled quads, strokes render with
+    // consistent sub-pixel coverage at every zoom level.
+    const fillColor = assertDefined(style.fill)
+    graphics.lineStyle(1, fillColor, fillAlpha)
+    for (const bridge of result.bridges) {
+      graphics.beginPath()
+      graphics.moveTo(bridge.a.x, bridge.a.y)
+      graphics.lineTo(bridge.b.x, bridge.b.y)
+      graphics.strokePath()
+    }
+  }
+}
+
+interface BridgeEdge {
+  a: { x: number; y: number }
+  b: { x: number; y: number }
+}
+
+/**
+ * Merge an outer ring with one or more hole rings into a single simple
+ * polygon by inserting bridge edges.
+ *
+ * For each hole the algorithm finds the pair of vertices (one on the
+ * current merged ring, one on the hole) with the smallest Euclidean
+ * distance and splices the hole into the ring at that point:
+ *
+ *   …outer[i] → hole[j] → hole[j-1] → … → hole[j+1] → hole[j] → outer[i] → …
+ *
+ * The two bridge edges (outer[i]↔hole[j]) are nearly coincident, so the
+ * visual result is an invisible slit connecting the boundaries.
+ *
+ * Returns both the merged ring and the bridge edge locations so the
+ * caller can patch hairline rasterization cracks.
+ */
+export function buildBridgedPolygon(
+  outer: ReadonlyArray<{ x: number; y: number }>,
+  holes: ReadonlyArray<ReadonlyArray<{ x: number; y: number }>>,
+): { ring: Array<{ x: number; y: number }>; bridges: BridgeEdge[] } {
+  // Start with a mutable copy of the outer ring
+  let ring: Array<{ x: number; y: number }> = Array.from(outer)
+  const bridges: BridgeEdge[] = []
+
+  for (const hole of holes) {
+    // Find closest vertex pair between current ring and hole
+    let bestDist = Infinity
+    let bestRingIdx = 0
+    let bestHoleIdx = 0
+
+    for (let ri = 0; ri < ring.length; ri++) {
+      const rp = assertDefined(ring[ri])
+      for (let hi = 0; hi < hole.length; hi++) {
+        const hp = assertDefined(hole[hi])
+        const dx = rp.x - hp.x
+        const dy = rp.y - hp.y
+        const dist = dx * dx + dy * dy
+        if (dist < bestDist) {
+          bestDist = dist
+          bestRingIdx = ri
+          bestHoleIdx = hi
+        }
+      }
+    }
+
+    // Splice the hole into the ring at the bridge point.
+    // The hole is traversed starting from bestHoleIdx, wrapping around,
+    // and ending back at bestHoleIdx. Then we return to the ring vertex.
+    const bridgeOuter = assertDefined(ring[bestRingIdx])
+    const bridgeHole = assertDefined(hole[bestHoleIdx])
+    const holeLen = hole.length
+
+    bridges.push({ a: bridgeOuter, b: bridgeHole })
+
+    const spliced: Array<{ x: number; y: number }> = []
+
+    // Outer ring up to and including the bridge point
+    for (let i = 0; i <= bestRingIdx; i++) {
+      spliced.push(assertDefined(ring[i]))
+    }
+
+    // Traverse hole starting from bridge point, full loop back
+    for (let i = 0; i <= holeLen; i++) {
+      spliced.push(assertDefined(hole[(bestHoleIdx + i) % holeLen]))
+    }
+
+    // Bridge back: duplicate the outer bridge vertex
+    spliced.push(bridgeOuter)
+
+    // Rest of outer ring after bridge point
+    for (let i = bestRingIdx + 1; i < ring.length; i++) {
+      spliced.push(assertDefined(ring[i]))
+    }
+
+    ring = spliced
+  }
+
+  return { ring, bridges }
+}
+
+// ---------------------------------------------------------------------------
+// Winding-direction subpath grouping for earcut
+// ---------------------------------------------------------------------------
+
+interface FillGroup {
+  outer: ReadonlyArray<{ x: number; y: number }>
+  holes: ReadonlyArray<{ x: number; y: number }>[]
+}
+
+interface BBox {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+/**
+ * Group closed subpaths into outer rings + holes using winding direction
+ * and bounding-box containment.
+ *
+ * SVG nonzero fill rule: outer contours wind one direction, holes wind
+ * the opposite. We use signed area to classify each subpath, then assign
+ * holes to the smallest enclosing outer via bounding box.
+ */
+export function groupSubpathsForFill(
+  closed: ReadonlyArray<{
+    points: ReadonlyArray<{ x: number; y: number }>
+  }>,
+): FillGroup[] {
+  const n = closed.length
+  if (n === 1) {
+    return [{ outer: assertDefined(closed[0]).points, holes: [] }]
+  }
+
+  // Classify each subpath by winding direction and compute bounding box
+  interface SubpathInfo {
+    points: ReadonlyArray<{ x: number; y: number }>
+    area: number
+    bbox: BBox
+  }
+
+  const infos: SubpathInfo[] = []
+  for (let i = 0; i < n; i++) {
+    const pts = assertDefined(closed[i]).points
+    infos.push({
+      points: pts,
+      area: signedArea2(pts),
+      bbox: computeBBox(pts),
+    })
+  }
+
+  // Determine majority winding direction — outers are the majority
+  // (there are usually more outer shapes than holes)
+  let positiveArea = 0
+  let negativeArea = 0
+  for (const info of infos) {
+    if (info.area > 0) positiveArea += info.area
+    else negativeArea -= info.area
+  }
+  const outerIsPositive = positiveArea >= negativeArea
+
+  // Separate outers from holes
+  const outers: SubpathInfo[] = []
+  const holes: SubpathInfo[] = []
+
+  for (const info of infos) {
+    if (info.area > 0 === outerIsPositive) {
+      outers.push(info)
+    } else {
+      holes.push(info)
+    }
+  }
+
+  // If no outers detected, treat everything as outer
+  if (outers.length === 0) {
+    return infos.map((info) => ({ outer: info.points, holes: [] }))
+  }
+
+  // Build groups, sorted by area descending (smallest outer first for assignment)
+  const groups: FillGroup[] = outers.map((o) => ({
+    outer: o.points,
+    holes: [],
+  }))
+
+  // Assign each hole to the smallest outer whose bbox fully contains it
+  for (const hole of holes) {
+    let bestIdx = -1
+    let bestArea = Infinity
+
+    for (let g = 0; g < outers.length; g++) {
+      const outer = assertDefined(outers[g])
+      if (
+        bboxContains(outer.bbox, hole.bbox) &&
+        Math.abs(outer.area) < bestArea
+      ) {
+        bestArea = Math.abs(outer.area)
+        bestIdx = g
+      }
+    }
+
+    if (bestIdx >= 0) {
+      assertDefined(groups[bestIdx]).holes.push(hole.points)
+    }
+    // Holes with no enclosing outer are dropped (not rendered)
+  }
+
+  return groups
+}
+
+function computeBBox(points: ReadonlyArray<{ x: number; y: number }>): BBox {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const p of points) {
+    if (p.x < minX) minX = p.x
+    if (p.y < minY) minY = p.y
+    if (p.x > maxX) maxX = p.x
+    if (p.y > maxY) maxY = p.y
+  }
+  return { minX, minY, maxX, maxY }
+}
+
+function bboxContains(outer: BBox, inner: BBox): boolean {
+  return (
+    inner.minX >= outer.minX &&
+    inner.minY >= outer.minY &&
+    inner.maxX <= outer.maxX &&
+    inner.maxY <= outer.maxY
   )
 }
+
+/** Signed area × 2 of a polygon (positive = CW in screen coords). */
+export function signedArea2(
+  points: ReadonlyArray<{ x: number; y: number }>,
+): number {
+  let sum = 0
+  for (let i = 0, len = points.length; i < len; i++) {
+    const a = assertDefined(points[i])
+    const b = assertDefined(points[(i + 1) % len])
+    sum += (b.x - a.x) * (b.y + a.y)
+  }
+  return sum
+}
+
+// ---------------------------------------------------------------------------
+// Arc conversion: SVG endpoint → center parameterization
+// ---------------------------------------------------------------------------
 
 /**
  * SVG endpoint parameterization → center parameterization.
@@ -259,7 +665,6 @@ function endpointToCenter(
   ry: number
   startAngle: number
   endAngle: number
-  clockwise: boolean
 } {
   const phiRad = (phi * Math.PI) / 180
   const cosPhi = Math.cos(phiRad)
@@ -321,7 +726,6 @@ function endpointToCenter(
     ry,
     startAngle,
     endAngle: startAngle + dTheta,
-    clockwise: !fS,
   }
 }
 
@@ -337,7 +741,44 @@ function vectorAngle(ux: number, uy: number, vx: number, vy: number): number {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function splitSubpaths(commands: PathCommand[]): PathCommand[][] {
+const EPSILON_SQ = 0.01 // squared distance threshold for deduplication
+
+/**
+ * Remove consecutive near-duplicate points that confuse earcut.
+ * Also strips a duplicate closing vertex (last ≈ first).
+ */
+export function deduplicatePoints<T extends { x: number; y: number }>(
+  points: T[],
+): T[] {
+  if (points.length < 2) return points
+
+  const result: T[] = [assertDefined(points[0])]
+
+  for (let i = 1; i < points.length; i++) {
+    const prev = assertDefined(result[result.length - 1])
+    const curr = assertDefined(points[i])
+    const dx = curr.x - prev.x
+    const dy = curr.y - prev.y
+    if (dx * dx + dy * dy > EPSILON_SQ) {
+      result.push(curr)
+    }
+  }
+
+  // Remove closing duplicate (last ≈ first)
+  if (result.length > 2) {
+    const first = assertDefined(result[0])
+    const last = assertDefined(result[result.length - 1])
+    const dx = last.x - first.x
+    const dy = last.y - first.y
+    if (dx * dx + dy * dy <= EPSILON_SQ) {
+      result.pop()
+    }
+  }
+
+  return result
+}
+
+export function splitSubpaths(commands: PathCommand[]): PathCommand[][] {
   const subpaths: PathCommand[][] = []
   let current: PathCommand[] = []
 
@@ -353,50 +794,6 @@ function splitSubpaths(commands: PathCommand[]): PathCommand[][] {
   }
 
   return subpaths
-}
-
-function applyStyles(
-  graphics: Phaser.GameObjects.Graphics,
-  style: SVGStyle,
-  fillAlpha: number,
-  strokeAlpha: number,
-): void {
-  if (style.fill !== null) {
-    graphics.fillStyle(style.fill, fillAlpha)
-  }
-  if (style.stroke !== null) {
-    graphics.lineStyle(style.strokeWidth, style.stroke, strokeAlpha)
-  }
-}
-
-function applyFillAndStroke(
-  graphics: Phaser.GameObjects.Graphics,
-  style: SVGStyle,
-  _fillAlpha: number,
-  _strokeAlpha: number,
-): void {
-  if (style.fill !== null) {
-    graphics.fillPath()
-  }
-  if (style.stroke !== null) {
-    graphics.strokePath()
-  }
-}
-
-function verticesFromCommands(commands: PathCommand[]): {
-  vertices: Point2D[]
-  closed: boolean
-} {
-  const vertices: Point2D[] = []
-  let closed = false
-  for (const cmd of commands) {
-    if (cmd.type === "Z") {
-      closed = true
-    } else if ("x" in cmd && "y" in cmd) {
-      vertices.push(cmd)
-    }
-  }
-  return { vertices, closed }
 }
 
 /**
