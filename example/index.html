@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>phaser-svg playground</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #1a1a2e;
+            color: #ccc;
+            font-family: system-ui, sans-serif;
+            padding: 24px;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: #eee;
+        }
+
+        .comparisons {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .comparison {
+            display: flex;
+            gap: 24px;
+            align-items: flex-start;
+        }
+
+        .comparison h2 {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .panel {
+            background: #16213e;
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .panel svg {
+            display: block;
+        }
+
+        .panel canvas {
+            display: block;
+        }
+
+        .label {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>phaser-svg — browser vs Phaser comparison</h1>
+    <div id="comparisons" class="comparisons"></div>
+    <script type="module" src="./main.ts"></script>
+</body>
+
+</html>
