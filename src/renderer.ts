@@ -1,5 +1,6 @@
 import Phaser from "phaser"
 import { assertDefined } from "./assert.ts"
+import { computeBevelJoin, type Point2D } from "./line-join.ts"
 import type { PathCommand, SVGStyle } from "./types.ts"
 
 export interface RenderOptions {
@@ -80,7 +81,8 @@ function renderSimplePath(
   }
 
   applyFillAndStroke(graphics, style, fillAlpha, strokeAlpha)
-  coverLineJoins(graphics, commands, style, strokeAlpha)
+  const { vertices, closed } = verticesFromCommands(commands)
+  drawLineJoins(graphics, vertices, closed, style, strokeAlpha)
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +157,8 @@ function renderComplexPath(
         graphics.closePath()
       }
       applyFillAndStroke(graphics, style, fillAlpha, strokeAlpha)
-      coverLineJoinPoints(graphics, points, style, strokeAlpha)
+      const joinPoints = closed ? points.slice(0, -1) : points
+      drawLineJoins(graphics, joinPoints, closed, style, strokeAlpha)
     }
   }
 }
@@ -355,46 +358,77 @@ function applyFillAndStroke(
   }
 }
 
-/**
- * Draw filled circles at path vertices to cover WebGL line join gaps.
- * Only activates for round line joins/caps.
- */
-function coverLineJoins(
-  graphics: Phaser.GameObjects.Graphics,
-  commands: PathCommand[],
-  style: SVGStyle,
-  strokeAlpha: number,
-): void {
-  if (style.stroke === null || style.strokeWidth < 2) return
-  if (style.lineJoin !== "round" && style.lineCap !== "round") return
-
-  const r = style.strokeWidth / 2
-  graphics.fillStyle(style.stroke, strokeAlpha)
-
+function verticesFromCommands(commands: PathCommand[]): {
+  vertices: Point2D[]
+  closed: boolean
+} {
+  const vertices: Point2D[] = []
+  let closed = false
   for (const cmd of commands) {
-    if ("x" in cmd && "y" in cmd) {
-      graphics.fillCircle(cmd.x, cmd.y, r)
+    if (cmd.type === "Z") {
+      closed = true
+    } else if ("x" in cmd && "y" in cmd) {
+      vertices.push(cmd)
     }
   }
+  return { vertices, closed }
 }
 
 /**
- * Cover line join gaps for a tessellated point array.
- * Only activates for round line joins/caps.
+ * Draw line join decorations at vertices.
+ * Handles round (circles) and bevel (triangles) joins.
  */
-function coverLineJoinPoints(
+function drawLineJoins(
   graphics: Phaser.GameObjects.Graphics,
-  points: Phaser.Math.Vector2[],
+  points: ReadonlyArray<Point2D>,
+  closed: boolean,
   style: SVGStyle,
   strokeAlpha: number,
 ): void {
   if (style.stroke === null || style.strokeWidth < 2) return
-  if (style.lineJoin !== "round" && style.lineCap !== "round") return
 
-  const r = style.strokeWidth / 2
+  const n = points.length
+  const hw = style.strokeWidth / 2
+  const needsJoins = style.lineJoin === "round" || style.lineJoin === "bevel"
+  const needsCaps = !closed && style.lineCap === "round"
+  if (!needsJoins && !needsCaps) return
+  if (n < 2) return
+
   graphics.fillStyle(style.stroke, strokeAlpha)
 
-  for (const pt of points) {
-    graphics.fillCircle(pt.x, pt.y, r)
+  // Join decorations at interior vertices (all vertices for closed paths)
+  if (needsJoins && n >= 3) {
+    const start = closed ? 0 : 1
+    const end = closed ? n : n - 1
+
+    for (let i = start; i < end; i++) {
+      const prev = assertDefined(points[(i - 1 + n) % n])
+      const curr = assertDefined(points[i])
+      const next = assertDefined(points[(i + 1) % n])
+
+      if (style.lineJoin === "round") {
+        graphics.fillCircle(curr.x, curr.y, hw)
+      } else {
+        const bevel = computeBevelJoin(prev, curr, next, hw)
+        if (bevel) {
+          graphics.beginPath()
+          graphics.moveTo(curr.x, curr.y)
+          graphics.lineTo(bevel[0].x, bevel[0].y)
+          graphics.lineTo(bevel[1].x, bevel[1].y)
+          graphics.closePath()
+          graphics.fillPath()
+        }
+      }
+    }
+  }
+
+  // Round caps at endpoints (open paths only)
+  if (needsCaps) {
+    const first = assertDefined(points[0])
+    graphics.fillCircle(first.x, first.y, hw)
+    if (n >= 2) {
+      const last = assertDefined(points[n - 1])
+      graphics.fillCircle(last.x, last.y, hw)
+    }
   }
 }
