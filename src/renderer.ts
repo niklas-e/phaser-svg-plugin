@@ -1,5 +1,6 @@
 import Phaser from "phaser"
 import { assertDefined } from "./assert.ts"
+import { computeSquareCap } from "./line-cap.ts"
 import { computeBevelJoin, type Point2D } from "./line-join.ts"
 import type { PathCommand, SVGStyle } from "./types.ts"
 
@@ -390,7 +391,8 @@ function drawLineJoins(
   const n = points.length
   const hw = style.strokeWidth / 2
   const needsJoins = style.lineJoin === "round" || style.lineJoin === "bevel"
-  const needsCaps = !closed && style.lineCap === "round"
+  const needsCaps =
+    !closed && (style.lineCap === "round" || style.lineCap === "square")
   if (!needsJoins && !needsCaps) return
   if (n < 2) return
 
@@ -422,13 +424,44 @@ function drawLineJoins(
     }
   }
 
-  // Round caps at endpoints (open paths only)
+  // Caps at endpoints (open paths only)
   if (needsCaps) {
-    const first = assertDefined(points[0])
-    graphics.fillCircle(first.x, first.y, hw)
-    if (n >= 2) {
-      const last = assertDefined(points[n - 1])
-      graphics.fillCircle(last.x, last.y, hw)
+    if (style.lineCap === "round") {
+      const first = assertDefined(points[0])
+      graphics.fillCircle(first.x, first.y, hw)
+      if (n >= 2) {
+        const last = assertDefined(points[n - 1])
+        graphics.fillCircle(last.x, last.y, hw)
+      }
+    } else {
+      // square cap
+      const first = assertDefined(points[0])
+      const second = assertDefined(points[1])
+      const startCap = computeSquareCap(first, second, hw)
+      if (startCap) {
+        graphics.beginPath()
+        graphics.moveTo(startCap[0].x, startCap[0].y)
+        graphics.lineTo(startCap[1].x, startCap[1].y)
+        graphics.lineTo(startCap[2].x, startCap[2].y)
+        graphics.lineTo(startCap[3].x, startCap[3].y)
+        graphics.closePath()
+        graphics.fillPath()
+      }
+
+      if (n >= 2) {
+        const last = assertDefined(points[n - 1])
+        const secondLast = assertDefined(points[n - 2])
+        const endCap = computeSquareCap(last, secondLast, hw)
+        if (endCap) {
+          graphics.beginPath()
+          graphics.moveTo(endCap[0].x, endCap[0].y)
+          graphics.lineTo(endCap[1].x, endCap[1].y)
+          graphics.lineTo(endCap[2].x, endCap[2].y)
+          graphics.lineTo(endCap[3].x, endCap[3].y)
+          graphics.closePath()
+          graphics.fillPath()
+        }
+      }
     }
   }
 }
