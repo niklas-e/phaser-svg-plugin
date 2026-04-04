@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import Phaser from "phaser"
 import { drawSVG } from "../src/index.ts"
 
