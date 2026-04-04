@@ -72,6 +72,8 @@ function resolveStyleWithOverrides(
     stroke: partial?.stroke ?? null,
     strokeAlpha: partial?.strokeAlpha ?? 1,
     strokeWidth: partial?.strokeWidth ?? 1,
+    lineJoin: partial?.lineJoin ?? "miter",
+    lineCap: partial?.lineCap ?? "butt",
     opacity: partial?.opacity ?? 1,
   }
 }

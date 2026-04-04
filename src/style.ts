@@ -45,6 +45,16 @@ export function resolveStyle(attrs: Record<string, string>): SVGStyle {
     style.strokeWidth = Number(strokeWidth)
   }
 
+  const lineJoin = attrs["stroke-linejoin"]
+  if (lineJoin === "round" || lineJoin === "bevel" || lineJoin === "miter") {
+    style.lineJoin = lineJoin
+  }
+
+  const lineCap = attrs["stroke-linecap"]
+  if (lineCap === "round" || lineCap === "square" || lineCap === "butt") {
+    style.lineCap = lineCap
+  }
+
   const opacity = attrs.opacity
   if (opacity !== undefined) {
     style.opacity = Number(opacity)

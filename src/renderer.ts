@@ -80,6 +80,7 @@ function renderSimplePath(
   }
 
   applyFillAndStroke(graphics, style, fillAlpha, strokeAlpha)
+  coverLineJoins(graphics, commands, style, strokeAlpha)
 }
 
 // ---------------------------------------------------------------------------
@@ -154,6 +155,7 @@ function renderComplexPath(
         graphics.closePath()
       }
       applyFillAndStroke(graphics, style, fillAlpha, strokeAlpha)
+      coverLineJoinPoints(graphics, points, style, strokeAlpha)
     }
   }
 }
@@ -350,5 +352,49 @@ function applyFillAndStroke(
   }
   if (style.stroke !== null) {
     graphics.strokePath()
+  }
+}
+
+/**
+ * Draw filled circles at path vertices to cover WebGL line join gaps.
+ * Only activates for round line joins/caps.
+ */
+function coverLineJoins(
+  graphics: Phaser.GameObjects.Graphics,
+  commands: PathCommand[],
+  style: SVGStyle,
+  strokeAlpha: number,
+): void {
+  if (style.stroke === null || style.strokeWidth < 2) return
+  if (style.lineJoin !== "round" && style.lineCap !== "round") return
+
+  const r = style.strokeWidth / 2
+  graphics.fillStyle(style.stroke, strokeAlpha)
+
+  for (const cmd of commands) {
+    if ("x" in cmd && "y" in cmd) {
+      graphics.fillCircle(cmd.x, cmd.y, r)
+    }
+  }
+}
+
+/**
+ * Cover line join gaps for a tessellated point array.
+ * Only activates for round line joins/caps.
+ */
+function coverLineJoinPoints(
+  graphics: Phaser.GameObjects.Graphics,
+  points: Phaser.Math.Vector2[],
+  style: SVGStyle,
+  strokeAlpha: number,
+): void {
+  if (style.stroke === null || style.strokeWidth < 2) return
+  if (style.lineJoin !== "round" && style.lineCap !== "round") return
+
+  const r = style.strokeWidth / 2
+  graphics.fillStyle(style.stroke, strokeAlpha)
+
+  for (const pt of points) {
+    graphics.fillCircle(pt.x, pt.y, r)
   }
 }

@@ -44,4 +44,30 @@ describe("resolveStyle", () => {
     const style = resolveStyle({ stroke: "red", "stroke-opacity": "0.7" })
     assert.equal(style.strokeAlpha, 0.7)
   })
+
+  it("defaults lineJoin to miter and lineCap to butt", () => {
+    const style = resolveStyle({})
+    assert.equal(style.lineJoin, "miter")
+    assert.equal(style.lineCap, "butt")
+  })
+
+  it("parses stroke-linejoin", () => {
+    const style = resolveStyle({ "stroke-linejoin": "round" })
+    assert.equal(style.lineJoin, "round")
+  })
+
+  it("parses stroke-linecap", () => {
+    const style = resolveStyle({ "stroke-linecap": "square" })
+    assert.equal(style.lineCap, "square")
+  })
+
+  it("ignores invalid stroke-linejoin values", () => {
+    const style = resolveStyle({ "stroke-linejoin": "invalid" })
+    assert.equal(style.lineJoin, "miter")
+  })
+
+  it("ignores invalid stroke-linecap values", () => {
+    const style = resolveStyle({ "stroke-linecap": "invalid" })
+    assert.equal(style.lineCap, "butt")
+  })
 })

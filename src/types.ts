@@ -30,6 +30,8 @@ export interface SVGStyle {
   stroke: number | null // null = no stroke ("none")
   strokeAlpha: number
   strokeWidth: number
+  lineJoin: "miter" | "round" | "bevel"
+  lineCap: "butt" | "round" | "square"
   opacity: number
 }
 
@@ -39,5 +41,7 @@ export const DEFAULT_STYLE: SVGStyle = {
   stroke: null,
   strokeAlpha: 1,
   strokeWidth: 1,
+  lineJoin: "miter",
+  lineCap: "butt",
   opacity: 1,
 }
