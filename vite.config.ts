@@ -4,13 +4,16 @@ import { defineConfig } from "vite"
 export default defineConfig({
   build: {
     lib: {
-      entry: resolve(__dirname, "src/index.ts"),
-      name: "PhaserSVG",
+      entry: {
+        "phaser-svg": resolve(__dirname, "src/index.ts"),
+        "vite-plugin": resolve(__dirname, "src/vite-plugin.ts"),
+      },
       formats: ["es", "cjs"],
-      fileName: "phaser-svg",
+      fileName: (format, entryName) =>
+        format === "es" ? `${entryName}.js` : `${entryName}.cjs`,
     },
     rolldownOptions: {
-      external: ["phaser"],
+      external: ["phaser", /^node:/],
       output: {
         globals: {
           phaser: "Phaser",

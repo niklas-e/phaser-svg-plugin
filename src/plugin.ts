@@ -1,5 +1,6 @@
 import Phaser from "phaser"
 import { assertDefined } from "./assert.ts"
+import type { CompiledSVG } from "./compiler.ts"
 import { parsePath } from "./path-parser.ts"
 import { type RenderOptions, renderPath } from "./renderer.ts"
 import { resolveStyle } from "./style.ts"
@@ -60,6 +61,31 @@ export function drawSVG(
 
     const commands = parsePath(d)
     renderPath(graphics, commands, style, options)
+  }
+}
+
+/**
+ * Render a pre-compiled SVG onto a Graphics object.
+ *
+ * Use with `compileSVG()` or the `phaser-svg/vite` build plugin to
+ * skip runtime parsing entirely.
+ */
+export function drawCompiledSVG(
+  graphics: Phaser.GameObjects.Graphics,
+  compiled: CompiledSVG,
+  options?: SVGPluginOptions | undefined,
+): void {
+  for (const { commands, style } of compiled) {
+    const resolved = { ...style }
+
+    if (options?.overrideFill !== undefined) {
+      resolved.fill = options.overrideFill
+    }
+    if (options?.overrideStroke !== undefined) {
+      resolved.stroke = options.overrideStroke
+    }
+
+    renderPath(graphics, commands, resolved, options)
   }
 }
 
@@ -135,6 +161,18 @@ export class SVGPlugin extends Phaser.Plugins.ScenePlugin {
     options?: RenderOptions | undefined,
   ): void {
     drawSVGPath(graphics, d, style, { ...this.defaultOptions, ...options })
+  }
+
+  /** Draw a pre-compiled SVG onto a Graphics object. */
+  drawCompiled(
+    graphics: Phaser.GameObjects.Graphics,
+    compiled: CompiledSVG,
+    options?: SVGPluginOptions | undefined,
+  ): void {
+    drawCompiledSVG(graphics, compiled, {
+      ...this.defaultOptions,
+      ...options,
+    })
   }
 
   destroy(): void {
