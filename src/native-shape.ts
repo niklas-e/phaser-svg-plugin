@@ -16,7 +16,7 @@ export function parseNativeShape(
     const cy = parseLengthOr(attrs.cy, 0)
     const r = parseLength(attrs.r)
     if (r === undefined || r <= 0) return undefined
-    return { kind: "circle", cx, cy, r }
+    return applyShapeTransform({ kind: "circle", cx, cy, r }, attrs.transform)
   }
 
   if (kind === "ellipse") {
@@ -26,7 +26,10 @@ export function parseNativeShape(
     const ry = parseLength(attrs.ry)
     if (rx === undefined || ry === undefined) return undefined
     if (rx <= 0 || ry <= 0) return undefined
-    return { kind: "ellipse", cx, cy, rx, ry }
+    return applyShapeTransform(
+      { kind: "ellipse", cx, cy, rx, ry },
+      attrs.transform,
+    )
   }
 
   return undefined
@@ -183,6 +186,76 @@ function computeEllipseSegments(rx: number, ry: number): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
+}
+
+interface Affine2D {
+  a: number
+  b: number
+  c: number
+  d: number
+  e: number
+  f: number
+}
+
+function applyShapeTransform(
+  shape: NativeShape,
+  rawTransform: string | undefined,
+): NativeShape {
+  const matrix = parseMatrixTransform(rawTransform)
+  if (!matrix) return shape
+
+  const cx = matrix.a * shape.cx + matrix.c * shape.cy + matrix.e
+  const cy = matrix.b * shape.cx + matrix.d * shape.cy + matrix.f
+
+  // Approximate transformed radii from transformed unit axes. This handles
+  // translation, scale and reflection exactly, and gives a stable fallback
+  // for more complex matrices.
+  const sx = Math.hypot(matrix.a, matrix.b)
+  const sy = Math.hypot(matrix.c, matrix.d)
+
+  if (shape.kind === "circle") {
+    const rx = shape.r * sx
+    const ry = shape.r * sy
+    if (Math.abs(rx - ry) < 1e-9) {
+      return { kind: "circle", cx, cy, r: (rx + ry) / 2 }
+    }
+    return { kind: "ellipse", cx, cy, rx, ry }
+  }
+
+  return {
+    kind: "ellipse",
+    cx,
+    cy,
+    rx: shape.rx * sx,
+    ry: shape.ry * sy,
+  }
+}
+
+function parseMatrixTransform(raw: string | undefined): Affine2D | undefined {
+  if (!raw) return undefined
+
+  const match = raw.match(/matrix\s*\(([^)]*)\)/i)
+  if (!match?.[1]) return undefined
+
+  const values = Array.from(
+    match[1].matchAll(/[-+]?(?:\d*\.\d+|\d+)(?:[eE][-+]?\d+)?/g),
+    (m) => Number(m[0]),
+  )
+  if (values.length !== 6) return undefined
+
+  const [a, b, c, d, e, f] = values
+  if (
+    a === undefined ||
+    b === undefined ||
+    c === undefined ||
+    d === undefined ||
+    e === undefined ||
+    f === undefined
+  ) {
+    return undefined
+  }
+
+  return { a, b, c, d, e, f }
 }
 
 function parseLength(
