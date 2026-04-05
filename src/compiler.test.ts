@@ -89,7 +89,7 @@ describe("compileSVG", () => {
   })
 
   it("returns empty paths for SVG with no supported shapes", () => {
-    const svg = `<svg><ellipse cx="10" cy="10" rx="10" ry="8" /></svg>`
+    const svg = `<svg><line x1="0" y1="0" x2="10" y2="10" /></svg>`
     const result = compileSVG(svg)
 
     assert.equal(result.paths.length, 0)
@@ -106,6 +106,19 @@ describe("compileSVG", () => {
     assert.equal(assertDefined(commands[2]).type, "A")
     assert.equal(assertDefined(commands[3]).type, "Z")
     assert.equal(assertDefined(result.paths[0]).style.fill, 0xff00ff)
+  })
+
+  it("compiles ellipse elements", () => {
+    const svg = `<svg><ellipse cx="20" cy="14" rx="8" ry="4" fill="#00ffff" /></svg>`
+    const result = compileSVG(svg)
+
+    assert.equal(result.paths.length, 1)
+    const commands = assertDefined(result.paths[0]).commands
+    assert.equal(assertDefined(commands[0]).type, "M")
+    assert.equal(assertDefined(commands[1]).type, "A")
+    assert.equal(assertDefined(commands[2]).type, "A")
+    assert.equal(assertDefined(commands[3]).type, "Z")
+    assert.equal(assertDefined(result.paths[0]).style.fill, 0x00ffff)
   })
 
   it("compiles rect elements", () => {

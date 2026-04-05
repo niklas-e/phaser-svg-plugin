@@ -101,9 +101,42 @@ describe("convertShape", () => {
     )
   })
 
+  it("converts ellipse to two arc commands", () => {
+    const converted = convertShape("ellipse", {
+      cx: "20",
+      cy: "14",
+      rx: "8",
+      ry: "4",
+    })
+
+    assert.ok(converted)
+    assert.equal(converted.d, "M 28 14 A 8 4 0 1 0 12 14 A 8 4 0 1 0 28 14 Z")
+  })
+
+  it("returns undefined for invalid ellipse", () => {
+    assert.equal(
+      convertShape("ellipse", {
+        cx: "10",
+        cy: "10",
+        ry: "5",
+      }),
+      undefined,
+    )
+
+    assert.equal(
+      convertShape("ellipse", {
+        cx: "10",
+        cy: "10",
+        rx: "5",
+        ry: "0",
+      }),
+      undefined,
+    )
+  })
+
   it("returns undefined for unsupported element", () => {
     assert.equal(
-      convertShape("ellipse", { cx: "10", cy: "10", rx: "10" }),
+      convertShape("line", { x1: "0", y1: "0", x2: "10", y2: "10" }),
       undefined,
     )
   })

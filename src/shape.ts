@@ -9,7 +9,7 @@ export interface ConvertedShape {
 /**
  * Convert a supported SVG shape element to path data + resolved style.
  *
- * Supported now: path, rect, circle
+ * Supported now: path, rect, circle, ellipse
  */
 export function convertShape(
   tagName: string,
@@ -24,6 +24,8 @@ export function convertShape(
     d = rectToPathData(attrs)
   } else if (normalisedTag === "circle") {
     d = circleToPathData(attrs)
+  } else if (normalisedTag === "ellipse") {
+    d = ellipseToPathData(attrs)
   }
 
   if (!d) return undefined
@@ -82,6 +84,27 @@ function circleToPathData(attrs: Record<string, string>): string | undefined {
     `M ${rightX} ${cy}`,
     `A ${r} ${r} 0 1 0 ${leftX} ${cy}`,
     `A ${r} ${r} 0 1 0 ${rightX} ${cy}`,
+    "Z",
+  ].join(" ")
+}
+
+function ellipseToPathData(attrs: Record<string, string>): string | undefined {
+  const cx = parseLengthOr(attrs.cx, 0)
+  const cy = parseLengthOr(attrs.cy, 0)
+  const rx = parseLength(attrs.rx)
+  const ry = parseLength(attrs.ry)
+
+  if (rx === undefined || ry === undefined) return undefined
+  if (rx <= 0 || ry <= 0) return undefined
+
+  const leftX = cx - rx
+  const rightX = cx + rx
+
+  // Ellipse as two half-arcs.
+  return [
+    `M ${rightX} ${cy}`,
+    `A ${rx} ${ry} 0 1 0 ${leftX} ${cy}`,
+    `A ${rx} ${ry} 0 1 0 ${rightX} ${cy}`,
     "Z",
   ].join(" ")
 }
