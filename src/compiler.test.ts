@@ -89,10 +89,51 @@ describe("compileSVG", () => {
   })
 
   it("returns empty paths for SVG with no supported shapes", () => {
-    const svg = `<svg><line x1="0" y1="0" x2="10" y2="10" /></svg>`
+    const svg = `<svg><g><defs /></g></svg>`
     const result = compileSVG(svg)
 
     assert.equal(result.paths.length, 0)
+  })
+
+  it("compiles line elements", () => {
+    const svg = `<svg><line x1="2" y1="4" x2="12" y2="18" stroke="#ffffff" /></svg>`
+    const result = compileSVG(svg)
+
+    assert.equal(result.paths.length, 1)
+    const commands = assertDefined(result.paths[0]).commands
+    assert.deepStrictEqual(commands, [
+      { type: "M", x: 2, y: 4 },
+      { type: "L", x: 12, y: 18 },
+    ])
+  })
+
+  it("compiles polyline elements", () => {
+    const svg = `<svg><polyline points="0,0 10,5 20,0" stroke="#ffffff" /></svg>`
+    const result = compileSVG(svg)
+
+    assert.equal(result.paths.length, 1)
+    const commands = assertDefined(result.paths[0]).commands
+    assert.deepStrictEqual(commands, [
+      { type: "M", x: 0, y: 0 },
+      { type: "L", x: 10, y: 5 },
+      { type: "L", x: 20, y: 0 },
+    ])
+  })
+
+  it("compiles polygon elements", () => {
+    const svg = `<svg><polygon points="5,5 15,5 15,15 5,15" fill="#ffaa00" /></svg>`
+    const result = compileSVG(svg)
+
+    assert.equal(result.paths.length, 1)
+    const commands = assertDefined(result.paths[0]).commands
+    assert.deepStrictEqual(commands, [
+      { type: "M", x: 5, y: 5 },
+      { type: "L", x: 15, y: 5 },
+      { type: "L", x: 15, y: 15 },
+      { type: "L", x: 5, y: 15 },
+      { type: "Z" },
+    ])
+    assert.equal(assertDefined(result.paths[0]).style.fill, 0xffaa00)
   })
 
   it("compiles circle elements", () => {

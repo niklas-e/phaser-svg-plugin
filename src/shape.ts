@@ -9,7 +9,7 @@ export interface ConvertedShape {
 /**
  * Convert a supported SVG shape element to path data + resolved style.
  *
- * Supported now: path, rect, circle, ellipse
+ * Supported now: path, rect, circle, ellipse, line, polyline, polygon
  */
 export function convertShape(
   tagName: string,
@@ -26,6 +26,12 @@ export function convertShape(
     d = circleToPathData(attrs)
   } else if (normalisedTag === "ellipse") {
     d = ellipseToPathData(attrs)
+  } else if (normalisedTag === "line") {
+    d = lineToPathData(attrs)
+  } else if (normalisedTag === "polyline") {
+    d = polylineToPathData(attrs)
+  } else if (normalisedTag === "polygon") {
+    d = polygonToPathData(attrs)
   }
 
   if (!d) return undefined
@@ -107,6 +113,56 @@ function ellipseToPathData(attrs: Record<string, string>): string | undefined {
     `A ${rx} ${ry} 0 1 0 ${rightX} ${cy}`,
     "Z",
   ].join(" ")
+}
+
+function lineToPathData(attrs: Record<string, string>): string {
+  const x1 = parseLengthOr(attrs.x1, 0)
+  const y1 = parseLengthOr(attrs.y1, 0)
+  const x2 = parseLengthOr(attrs.x2, 0)
+  const y2 = parseLengthOr(attrs.y2, 0)
+
+  return `M ${x1} ${y1} L ${x2} ${y2}`
+}
+
+function polylineToPathData(attrs: Record<string, string>): string | undefined {
+  const points = parsePoints(attrs.points)
+  if (!points || points.length < 2) return undefined
+  const first = points[0]
+  if (!first) return undefined
+
+  return [
+    `M ${first.x} ${first.y}`,
+    ...points.slice(1).map((pt) => `L ${pt.x} ${pt.y}`),
+  ].join(" ")
+}
+
+function polygonToPathData(attrs: Record<string, string>): string | undefined {
+  const d = polylineToPathData(attrs)
+  if (!d) return undefined
+  return `${d} Z`
+}
+
+function parsePoints(
+  raw: string | undefined,
+): Array<{ x: number; y: number }> | undefined {
+  if (!raw) return undefined
+
+  const numberRegex = /[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g
+  const numbers = Array.from(raw.matchAll(numberRegex), (match) =>
+    Number.parseFloat(match[0]),
+  ).filter((value) => Number.isFinite(value))
+
+  if (numbers.length < 4) return undefined
+
+  const points: Array<{ x: number; y: number }> = []
+  for (let i = 0; i + 1 < numbers.length; i += 2) {
+    const x = numbers[i]
+    const y = numbers[i + 1]
+    if (x === undefined || y === undefined) continue
+    points.push({ x, y })
+  }
+
+  return points.length > 0 ? points : undefined
 }
 
 function normaliseRectRadii(

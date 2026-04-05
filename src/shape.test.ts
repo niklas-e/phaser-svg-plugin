@@ -134,9 +134,55 @@ describe("convertShape", () => {
     )
   })
 
+  it("converts line to M+L path", () => {
+    const converted = convertShape("line", {
+      x1: "2",
+      y1: "4",
+      x2: "12",
+      y2: "18",
+    })
+
+    assert.ok(converted)
+    assert.equal(converted.d, "M 2 4 L 12 18")
+  })
+
+  it("converts polyline to M+L path", () => {
+    const converted = convertShape("polyline", {
+      points: "0,0 10,5 20,0 30,10",
+    })
+
+    assert.ok(converted)
+    assert.equal(converted.d, "M 0 0 L 10 5 L 20 0 L 30 10")
+  })
+
+  it("converts polygon to closed M+L path", () => {
+    const converted = convertShape("polygon", {
+      points: "5,5 15,5 15,15 5,15",
+    })
+
+    assert.ok(converted)
+    assert.equal(converted.d, "M 5 5 L 15 5 L 15 15 L 5 15 Z")
+  })
+
+  it("returns undefined for invalid polyline and polygon points", () => {
+    assert.equal(
+      convertShape("polyline", {
+        points: "10,10",
+      }),
+      undefined,
+    )
+
+    assert.equal(
+      convertShape("polygon", {
+        points: "1,2,3",
+      }),
+      undefined,
+    )
+  })
+
   it("returns undefined for unsupported element", () => {
     assert.equal(
-      convertShape("line", { x1: "0", y1: "0", x2: "10", y2: "10" }),
+      convertShape("g", { transform: "translate(10,10)" }),
       undefined,
     )
   })

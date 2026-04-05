@@ -49,7 +49,9 @@ export function drawSVG(
   const viewBox = parseViewBox(svgEl.getAttribute("viewBox"))
   const transform = computeTransform(viewBox, options)
 
-  const shapes = doc.querySelectorAll("path,rect,circle,ellipse")
+  const shapes = doc.querySelectorAll(
+    "path,rect,circle,ellipse,line,polyline,polygon",
+  )
 
   for (const shapeEl of shapes) {
     const attrs: Record<string, string> = {}
