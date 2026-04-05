@@ -14,6 +14,7 @@ import relativeSvg from "./svg/relative.svg?raw"
 import hvRectSvg from "./svg/hv-rect.svg?raw"
 import rectPrimitivesSvg from "./svg/rect-primitives.svg?raw"
 import circlePrimitivesSvg from "./svg/circle-primitives.svg?raw"
+import ellipsePrimitivesSvg from "./svg/ellipse-primitives.svg?raw"
 import trufflecoreLogo from "./svg/trufflecore-logo.svg?raw"
 
 function assertDefined<T>(value: T | null | undefined): T {
@@ -61,6 +62,12 @@ const testCases: TestCase[] = [
     title: "Circle primitive (&lt;circle&gt;)",
     svg: circlePrimitivesSvg,
     width: 150,
+    height: 100,
+  },
+  {
+    title: "Ellipse primitive (&lt;ellipse&gt;)",
+    svg: ellipsePrimitivesSvg,
+    width: 160,
     height: 100,
   },
 ]
