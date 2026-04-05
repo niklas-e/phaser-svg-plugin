@@ -1,5 +1,5 @@
 import { parsePath } from "./path-parser.ts"
-import { resolveStyle } from "./style.ts"
+import { convertShape } from "./shape.ts"
 import type { PathCommand, SVGStyle, ViewBox } from "./types.ts"
 
 /** A pre-compiled SVG path: parsed commands with resolved style. */
@@ -23,14 +23,14 @@ export interface CompiledSVG {
  */
 export function compileSVG(svgString: string): CompiledSVG {
   const viewBox = extractViewBox(svgString) ?? null
-  const pathElements = extractPathElements(svgString)
+  const elements = extractShapeElements(svgString)
   const paths: CompiledPath[] = []
 
-  for (const attrs of pathElements) {
-    const d = attrs.d
-    if (!d) continue
+  for (const { tagName, attrs } of elements) {
+    const converted = convertShape(tagName, attrs)
+    if (!converted) continue
 
-    const style = resolveStyle(attrs)
+    const { d, style } = converted
     const commands = parsePath(d)
     paths.push({ commands, style })
   }
@@ -39,15 +39,19 @@ export function compileSVG(svgString: string): CompiledSVG {
 }
 
 /**
- * Extract attributes from all `<path>` elements in an SVG string.
+ * Extract attributes from supported shape elements in an SVG string.
  * Uses regex so it works without a DOM parser.
  */
-function extractPathElements(svgString: string): Record<string, string>[] {
-  const paths: Record<string, string>[] = []
-  const pathRegex = /<path\s+([^>]*?)\s*\/?>/gi
+function extractShapeElements(
+  svgString: string,
+): { tagName: string; attrs: Record<string, string> }[] {
+  const elements: { tagName: string; attrs: Record<string, string> }[] = []
+  const shapeRegex = /<(path|rect)\s+([^>]*?)\s*\/?>/gi
 
-  for (const match of svgString.matchAll(pathRegex)) {
-    const attrsStr = match[1]
+  for (const match of svgString.matchAll(shapeRegex)) {
+    const tagName = match[1]
+    const attrsStr = match[2]
+    if (!tagName) continue
     if (!attrsStr) continue
 
     const attrs: Record<string, string> = {}
@@ -61,10 +65,10 @@ function extractPathElements(svgString: string): Record<string, string>[] {
       }
     }
 
-    paths.push(attrs)
+    elements.push({ tagName, attrs })
   }
 
-  return paths
+  return elements
 }
 
 function extractViewBox(svgString: string): ViewBox | undefined {

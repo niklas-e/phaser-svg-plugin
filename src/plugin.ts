@@ -3,7 +3,7 @@ import { assertDefined } from "./assert.ts"
 import type { CompiledSVG } from "./compiler.ts"
 import { parsePath } from "./path-parser.ts"
 import { type RenderOptions, renderPath } from "./renderer.ts"
-import { resolveStyle } from "./style.ts"
+import { convertShape } from "./shape.ts"
 import { transformCommands, viewBoxTransform } from "./transform.ts"
 import type { SVGStyle, ViewBox } from "./types.ts"
 
@@ -49,18 +49,18 @@ export function drawSVG(
   const viewBox = parseViewBox(svgEl.getAttribute("viewBox"))
   const transform = computeTransform(viewBox, options)
 
-  const paths = doc.querySelectorAll("path")
+  const shapes = doc.querySelectorAll("path,rect")
 
-  for (const pathEl of paths) {
-    const d = pathEl.getAttribute("d")
-    if (!d) continue
-
+  for (const shapeEl of shapes) {
     const attrs: Record<string, string> = {}
-    for (const attr of pathEl.attributes) {
+    for (const attr of shapeEl.attributes) {
       attrs[attr.name] = attr.value
     }
 
-    const style = resolveStyle(attrs)
+    const converted = convertShape(shapeEl.tagName, attrs)
+    if (!converted) continue
+
+    const { d, style } = converted
 
     if (options?.overrideFill !== undefined) {
       style.fill = options.overrideFill

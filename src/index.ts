@@ -9,6 +9,7 @@ export {
   type SVGPluginOptions,
 } from "./plugin.ts"
 export { type RenderOptions, renderPath } from "./renderer.ts"
+export { convertShape, type ConvertedShape } from "./shape.ts"
 export { resolveStyle } from "./style.ts"
 export {
   DEFAULT_STYLE,

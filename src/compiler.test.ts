@@ -88,11 +88,42 @@ describe("compileSVG", () => {
     assert.equal(style.opacity, 0.9)
   })
 
-  it("returns empty paths for SVG with no paths", () => {
-    const svg = `<svg><rect width="10" height="10" /></svg>`
+  it("returns empty paths for SVG with no supported shapes", () => {
+    const svg = `<svg><circle cx="10" cy="10" r="10" /></svg>`
     const result = compileSVG(svg)
 
     assert.equal(result.paths.length, 0)
+  })
+
+  it("compiles rect elements", () => {
+    const svg = `<svg><rect x="10" y="20" width="30" height="40" fill="#00ff00" /></svg>`
+    const result = compileSVG(svg)
+
+    assert.equal(result.paths.length, 1)
+    const path = assertDefined(result.paths[0])
+    assert.deepStrictEqual(path.commands, [
+      { type: "M", x: 10, y: 20 },
+      { type: "L", x: 40, y: 20 },
+      { type: "L", x: 40, y: 60 },
+      { type: "L", x: 10, y: 60 },
+      { type: "L", x: 10, y: 20 },
+      { type: "Z" },
+    ])
+    assert.equal(path.style.fill, 0x00ff00)
+  })
+
+  it("compiles rounded rect elements", () => {
+    const svg = `<svg><rect width="20" height="10" rx="4" ry="2" /></svg>`
+    const result = compileSVG(svg)
+
+    assert.equal(result.paths.length, 1)
+    const commands = assertDefined(result.paths[0]).commands
+    assert.equal(assertDefined(commands[0]).type, "M")
+    assert.equal(assertDefined(commands[2]).type, "A")
+    assert.equal(assertDefined(commands[4]).type, "A")
+    assert.equal(assertDefined(commands[6]).type, "A")
+    assert.equal(assertDefined(commands[8]).type, "A")
+    assert.equal(assertDefined(commands[9]).type, "Z")
   })
 
   it("returns empty paths for empty string", () => {
