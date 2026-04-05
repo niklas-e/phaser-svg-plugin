@@ -7,6 +7,10 @@ import {
   transformNativeShape,
 } from "./native-shape.ts"
 import { parsePath } from "./path-parser.ts"
+import {
+  attrsFromElement,
+  filterPresentationAttrs,
+} from "./presentation-attrs.ts"
 import { type RenderOptions, renderPath } from "./renderer.ts"
 import { convertShape } from "./shape.ts"
 import { resolveStyle } from "./style.ts"
@@ -52,6 +56,7 @@ export function drawSVG(
   const doc = parser.parseFromString(svgString, "image/svg+xml")
 
   const svgEl = doc.documentElement
+  const inheritedStyleAttrs = filterPresentationAttrs(attrsFromElement(svgEl))
   const viewBox = parseViewBox(svgEl.getAttribute("viewBox"))
   const transform = computeTransform(viewBox, options)
 
@@ -60,14 +65,13 @@ export function drawSVG(
   )
 
   for (const shapeEl of shapes) {
-    const attrs: Record<string, string> = {}
-    for (const attr of shapeEl.attributes) {
-      attrs[attr.name] = attr.value
-    }
+    const attrs = attrsFromElement(shapeEl)
+
+    const styleAttrs = { ...inheritedStyleAttrs, ...attrs }
 
     const nativeShape = parseNativeShape(shapeEl.tagName, attrs)
     if (nativeShape) {
-      const style = resolveStyle(attrs)
+      const style = resolveStyle(styleAttrs)
 
       if (options?.overrideFill !== undefined) {
         style.fill = options.overrideFill
@@ -94,7 +98,7 @@ export function drawSVG(
       continue
     }
 
-    const converted = convertShape(shapeEl.tagName, attrs)
+    const converted = convertShape(shapeEl.tagName, styleAttrs)
     if (!converted) continue
 
     const { d, style } = converted

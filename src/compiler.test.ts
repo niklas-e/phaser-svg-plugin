@@ -188,6 +188,22 @@ describe("compileSVG", () => {
     }
   })
 
+  it("inherits root fill='none' for stroke-only circle", () => {
+    const svg = `<svg fill="none"><circle cx="33.5" cy="33.5" r="26" stroke="#3E2400" stroke-width="15" /></svg>`
+    const result = compileSVG(svg)
+
+    assert.equal(result.paths.length, 1)
+    const path = assertDefined(result.paths[0])
+    assert.equal(path.style.fill, null)
+    assert.equal(path.style.stroke, 0x3e2400)
+    assert.equal(path.style.strokeWidth, 15)
+
+    assert.equal(result.items.length, 1)
+    const item = assertDefined(result.items[0])
+    assert.equal(item.style.fill, null)
+    assert.equal(item.style.stroke, 0x3e2400)
+  })
+
   it("compiles rect elements", () => {
     const svg = `<svg><rect x="10" y="20" width="30" height="40" fill="#00ff00" /></svg>`
     const result = compileSVG(svg)

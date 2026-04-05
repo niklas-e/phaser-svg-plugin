@@ -1,5 +1,9 @@
 import { parseNativeShape, type NativeShape } from "./native-shape.ts"
 import { parsePath } from "./path-parser.ts"
+import {
+  filterPresentationAttrs,
+  parseAttributes,
+} from "./presentation-attrs.ts"
 import { convertShape } from "./shape.ts"
 import type { PathCommand, SVGStyle, ViewBox } from "./types.ts"
 
@@ -32,13 +36,15 @@ export interface CompiledSVG {
  */
 export function compileSVG(svgString: string): CompiledSVG {
   const viewBox = extractViewBox(svgString) ?? null
+  const inheritedStyleAttrs = extractSVGPresentationAttrs(svgString)
   const elements = extractShapeElements(svgString)
   const paths: CompiledPath[] = []
   const items: CompiledItem[] = []
 
   for (const { tagName, attrs } of elements) {
+    const styleAttrs = { ...inheritedStyleAttrs, ...attrs }
     const nativeShape = parseNativeShape(tagName, attrs)
-    const converted = convertShape(tagName, attrs)
+    const converted = convertShape(tagName, styleAttrs)
     if (!converted) continue
 
     const { d, style } = converted
@@ -72,21 +78,22 @@ function extractShapeElements(
     if (!tagName) continue
     if (!attrsStr) continue
 
-    const attrs: Record<string, string> = {}
-    const attrRegex = /([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
-
-    for (const attrMatch of attrsStr.matchAll(attrRegex)) {
-      const name = attrMatch[1]
-      const value = attrMatch[2] ?? attrMatch[3]
-      if (name !== undefined && value !== undefined) {
-        attrs[name] = value
-      }
-    }
+    const attrs = parseAttributes(attrsStr)
 
     elements.push({ tagName, attrs })
   }
 
   return elements
+}
+
+function extractSVGPresentationAttrs(
+  svgString: string,
+): Record<string, string> {
+  const match = svgString.match(/<svg\s+([^>]*?)>/i)
+  if (!match?.[1]) return {}
+
+  const rawAttrs = parseAttributes(match[1])
+  return filterPresentationAttrs(rawAttrs)
 }
 
 function extractViewBox(svgString: string): ViewBox | undefined {
