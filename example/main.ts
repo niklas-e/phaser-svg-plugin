@@ -12,6 +12,7 @@ import smoothCubicSvg from "./svg/smooth-cubic.svg?raw"
 import smoothQuadraticSvg from "./svg/smooth-quadratic.svg?raw"
 import relativeSvg from "./svg/relative.svg?raw"
 import hvRectSvg from "./svg/hv-rect.svg?raw"
+import rectPrimitivesSvg from "./svg/rect-primitives.svg?raw"
 import trufflecoreLogo from "./svg/trufflecore-logo.svg?raw"
 
 function assertDefined<T>(value: T | null | undefined): T {
@@ -49,6 +50,12 @@ const testCases: TestCase[] = [
   },
   { title: "Relative cmds (m/l/z)", svg: relativeSvg, width: 120, height: 100 },
   { title: "H / V commands", svg: hvRectSvg, width: 120, height: 100 },
+  {
+    title: "Rect primitive (&lt;rect&gt;)",
+    svg: rectPrimitivesSvg,
+    width: 150,
+    height: 100,
+  },
 ]
 
 const container = assertDefined(document.getElementById("comparisons"))
