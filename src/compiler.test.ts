@@ -93,6 +93,7 @@ describe("compileSVG", () => {
     const result = compileSVG(svg)
 
     assert.equal(result.paths.length, 0)
+    assert.equal(result.items.length, 0)
   })
 
   it("compiles line elements", () => {
@@ -147,6 +148,18 @@ describe("compileSVG", () => {
     assert.equal(assertDefined(commands[2]).type, "A")
     assert.equal(assertDefined(commands[3]).type, "Z")
     assert.equal(assertDefined(result.paths[0]).style.fill, 0xff00ff)
+
+    assert.equal(result.items.length, 1)
+    const item = assertDefined(result.items[0])
+    assert.equal(item.kind, "native")
+    if (item.kind === "native") {
+      assert.deepStrictEqual(item.shape, {
+        kind: "circle",
+        cx: 12,
+        cy: 18,
+        r: 6,
+      })
+    }
   })
 
   it("compiles ellipse elements", () => {
@@ -160,6 +173,19 @@ describe("compileSVG", () => {
     assert.equal(assertDefined(commands[2]).type, "A")
     assert.equal(assertDefined(commands[3]).type, "Z")
     assert.equal(assertDefined(result.paths[0]).style.fill, 0x00ffff)
+
+    assert.equal(result.items.length, 1)
+    const item = assertDefined(result.items[0])
+    assert.equal(item.kind, "native")
+    if (item.kind === "native") {
+      assert.deepStrictEqual(item.shape, {
+        kind: "ellipse",
+        cx: 20,
+        cy: 14,
+        rx: 8,
+        ry: 4,
+      })
+    }
   })
 
   it("compiles rect elements", () => {
@@ -195,6 +221,36 @@ describe("compileSVG", () => {
   it("returns empty paths for empty string", () => {
     const result = compileSVG("")
     assert.equal(result.paths.length, 0)
+    assert.equal(result.items.length, 0)
+  })
+
+  it("preserves source draw order in compiled items", () => {
+    const svg = `<svg>
+      <rect x="0" y="0" width="8" height="4" fill="#00ff00" />
+      <circle cx="10" cy="10" r="3" fill="#ff0000" />
+      <path d="M 0 0 L 1 1" stroke="#ffffff" />
+      <ellipse cx="20" cy="20" rx="6" ry="2" fill="#0000ff" />
+    </svg>`
+
+    const result = compileSVG(svg)
+
+    assert.equal(result.items.length, 4)
+    assert.deepStrictEqual(
+      result.items.map((item) => item.kind),
+      ["path", "native", "path", "native"],
+    )
+
+    const second = assertDefined(result.items[1])
+    assert.equal(second.kind, "native")
+    if (second.kind === "native") {
+      assert.equal(second.shape.kind, "circle")
+    }
+
+    const fourth = assertDefined(result.items[3])
+    assert.equal(fourth.kind, "native")
+    if (fourth.kind === "native") {
+      assert.equal(fourth.shape.kind, "ellipse")
+    }
   })
 
   it("result is JSON-serialisable", () => {

@@ -152,7 +152,7 @@ this.svg.setDefaults({
 
 | Function | Description |
 | --- | --- |
-| `compileSVG(svgString)` | Compile an SVG string into pre-parsed path data. Works in Node.js (no DOM required). |
+| `compileSVG(svgString)` | Compile an SVG string into pre-parsed draw data. Works in Node.js (no DOM required). |
 
 ### Lower-level utilities
 
@@ -170,8 +170,8 @@ this.svg.setDefaults({
 | Property | Type | Description |
 | --- | --- | --- |
 | `curveResolution` | `number` | Points per curve for tessellation (default `32`) |
-| `overrideFill` | `number` | Force fill colour for all paths |
-| `overrideStroke` | `number` | Force stroke colour for all paths |
+| `overrideFill` | `number` | Force fill colour for all shapes |
+| `overrideStroke` | `number` | Force stroke colour for all shapes |
 
 **`SVGStyle`** - resolved style for a single path:
 

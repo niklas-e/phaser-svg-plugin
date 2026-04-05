@@ -1,5 +1,10 @@
 export { type ParsedColor, parseColor } from "./color.ts"
-export { compileSVG, type CompiledPath, type CompiledSVG } from "./compiler.ts"
+export {
+  compileSVG,
+  type CompiledItem,
+  type CompiledPath,
+  type CompiledSVG,
+} from "./compiler.ts"
 export { parsePath } from "./path-parser.ts"
 export {
   drawCompiledSVG,

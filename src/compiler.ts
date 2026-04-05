@@ -1,3 +1,4 @@
+import { parseNativeShape, type NativeShape } from "./native-shape.ts"
 import { parsePath } from "./path-parser.ts"
 import { convertShape } from "./shape.ts"
 import type { PathCommand, SVGStyle, ViewBox } from "./types.ts"
@@ -8,14 +9,22 @@ export interface CompiledPath {
   style: SVGStyle
 }
 
+/** A pre-compiled shape item that preserves source draw order. */
+export type CompiledItem =
+  | { kind: "path"; commands: PathCommand[]; style: SVGStyle }
+  | { kind: "native"; shape: NativeShape; style: SVGStyle }
+
 /** Pre-compiled SVG ready for rendering without runtime parsing. */
 export interface CompiledSVG {
   viewBox: ViewBox | null
+  /** Ordered shape list used by the renderer. */
+  items: CompiledItem[]
+  /** Backward-compatible path list (all shapes converted to paths). */
   paths: CompiledPath[]
 }
 
 /**
- * Compile an SVG string into pre-parsed path commands and styles.
+ * Compile an SVG string into pre-parsed draw data.
  *
  * Runs without DOMParser so it works in Node.js and at build time.
  * The result can be serialised to JSON and rendered later with
@@ -25,17 +34,25 @@ export function compileSVG(svgString: string): CompiledSVG {
   const viewBox = extractViewBox(svgString) ?? null
   const elements = extractShapeElements(svgString)
   const paths: CompiledPath[] = []
+  const items: CompiledItem[] = []
 
   for (const { tagName, attrs } of elements) {
+    const nativeShape = parseNativeShape(tagName, attrs)
     const converted = convertShape(tagName, attrs)
     if (!converted) continue
 
     const { d, style } = converted
     const commands = parsePath(d)
     paths.push({ commands, style })
+
+    if (nativeShape) {
+      items.push({ kind: "native", shape: nativeShape, style })
+    } else {
+      items.push({ kind: "path", commands, style })
+    }
   }
 
-  return { viewBox, paths }
+  return { viewBox, items, paths }
 }
 
 /**

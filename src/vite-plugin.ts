@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises"
 import type { Plugin } from "vite"
 import { compileSVG } from "./compiler.ts"
 
-export type { CompiledPath, CompiledSVG } from "./compiler.ts"
+export type { CompiledItem, CompiledPath, CompiledSVG } from "./compiler.ts"
 
 /**
  * Vite plugin that compiles SVG files into pre-parsed phaser-svg
@@ -17,7 +17,7 @@ export type { CompiledPath, CompiledSVG } from "./compiler.ts"
  * })
  * ```
  *
- * Then import SVGs directly — they become pre-compiled path data:
+ * Then import SVGs directly — they become pre-compiled draw data:
  * ```ts
  * import heart from "./heart.svg"
  * drawCompiledSVG(graphics, heart)

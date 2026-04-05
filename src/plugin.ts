@@ -1,9 +1,15 @@
 import Phaser from "phaser"
 import { assertDefined } from "./assert.ts"
 import type { CompiledSVG } from "./compiler.ts"
+import {
+  drawNativeShape,
+  parseNativeShape,
+  transformNativeShape,
+} from "./native-shape.ts"
 import { parsePath } from "./path-parser.ts"
 import { type RenderOptions, renderPath } from "./renderer.ts"
 import { convertShape } from "./shape.ts"
+import { resolveStyle } from "./style.ts"
 import { transformCommands, viewBoxTransform } from "./transform.ts"
 import type { SVGStyle, ViewBox } from "./types.ts"
 
@@ -35,7 +41,7 @@ export function drawSVGPath(
 }
 
 /**
- * Parse an SVG string and render all `<path>` elements onto a Graphics object.
+ * Parse an SVG string and render all supported shape elements onto Graphics.
  */
 export function drawSVG(
   graphics: Phaser.GameObjects.Graphics,
@@ -57,6 +63,35 @@ export function drawSVG(
     const attrs: Record<string, string> = {}
     for (const attr of shapeEl.attributes) {
       attrs[attr.name] = attr.value
+    }
+
+    const nativeShape = parseNativeShape(shapeEl.tagName, attrs)
+    if (nativeShape) {
+      const style = resolveStyle(attrs)
+
+      if (options?.overrideFill !== undefined) {
+        style.fill = options.overrideFill
+      }
+      if (options?.overrideStroke !== undefined) {
+        style.stroke = options.overrideStroke
+      }
+
+      const transformedShape =
+        transform === undefined
+          ? nativeShape
+          : transformNativeShape(
+              nativeShape,
+              transform.scale,
+              transform.tx,
+              transform.ty,
+            )
+
+      if (transform) {
+        style.strokeWidth *= transform.scale
+      }
+
+      drawNativeShape(graphics, transformedShape, style)
+      continue
     }
 
     const converted = convertShape(shapeEl.tagName, attrs)
@@ -99,6 +134,54 @@ export function drawCompiledSVG(
   options?: SVGPluginOptions | undefined,
 ): void {
   const transform = computeTransform(compiled.viewBox, options)
+
+  const items = compiled.items
+  if (Array.isArray(items) && items.length > 0) {
+    for (const item of items) {
+      const resolved = { ...item.style }
+
+      if (options?.overrideFill !== undefined) {
+        resolved.fill = options.overrideFill
+      }
+      if (options?.overrideStroke !== undefined) {
+        resolved.stroke = options.overrideStroke
+      }
+
+      if (item.kind === "native") {
+        const shape =
+          transform === undefined
+            ? item.shape
+            : transformNativeShape(
+                item.shape,
+                transform.scale,
+                transform.tx,
+                transform.ty,
+              )
+
+        if (transform) {
+          resolved.strokeWidth *= transform.scale
+        }
+
+        drawNativeShape(graphics, shape, resolved)
+        continue
+      }
+
+      let commands = item.commands
+      if (transform) {
+        commands = transformCommands(
+          commands,
+          transform.scale,
+          transform.tx,
+          transform.ty,
+        )
+        resolved.strokeWidth *= transform.scale
+      }
+
+      renderPath(graphics, commands, resolved, options)
+    }
+
+    return
+  }
 
   for (const { commands: rawCmds, style: rawStyle } of compiled.paths) {
     const resolved = { ...rawStyle }
