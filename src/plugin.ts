@@ -13,6 +13,7 @@ import {
 } from "./presentation-attrs.ts"
 import { type RenderOptions, renderPath } from "./renderer.ts"
 import { convertShape } from "./shape.ts"
+import { isInsideNonRenderableContainer } from "./svg-structure.ts"
 import { resolveStyle } from "./style.ts"
 import { transformCommands, viewBoxTransform } from "./transform.ts"
 import type { SVGStyle, ViewBox } from "./types.ts"
@@ -65,6 +66,10 @@ export function drawSVG(
   )
 
   for (const shapeEl of shapes) {
+    if (isInsideNonRenderableContainer(shapeEl)) {
+      continue
+    }
+
     const attrs = attrsFromElement(shapeEl)
 
     const styleAttrs = { ...inheritedStyleAttrs, ...attrs }

@@ -5,6 +5,7 @@ import {
   parseAttributes,
 } from "./presentation-attrs.ts"
 import { convertShape } from "./shape.ts"
+import { stripNonRenderableSections } from "./svg-structure.ts"
 import type { PathCommand, SVGStyle, ViewBox } from "./types.ts"
 
 /** A pre-compiled SVG path: parsed commands with resolved style. */
@@ -37,7 +38,7 @@ export interface CompiledSVG {
 export function compileSVG(svgString: string): CompiledSVG {
   const viewBox = extractViewBox(svgString) ?? null
   const inheritedStyleAttrs = extractSVGPresentationAttrs(svgString)
-  const elements = extractShapeElements(svgString)
+  const elements = extractShapeElements(stripNonRenderableSections(svgString))
   const paths: CompiledPath[] = []
   const items: CompiledItem[] = []
 

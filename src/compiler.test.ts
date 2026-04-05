@@ -204,6 +204,29 @@ describe("compileSVG", () => {
     assert.equal(item.style.stroke, 0x3e2400)
   })
 
+  it("ignores helper geometry from defs/clipPath", () => {
+    const svg = `<svg>
+      <g clip-path="url(#clip0)">
+        <circle cx="10" cy="12" r="3" fill="#ff0000" />
+      </g>
+      <defs>
+        <clipPath id="clip0">
+          <rect width="100" height="100" fill="white" />
+        </clipPath>
+      </defs>
+    </svg>`
+
+    const result = compileSVG(svg)
+
+    // Only the visible circle should be compiled.
+    assert.equal(result.paths.length, 1)
+    assert.equal(result.items.length, 1)
+
+    const item = assertDefined(result.items[0])
+    assert.equal(item.kind, "native")
+    assert.equal(item.style.fill, 0xff0000)
+  })
+
   it("compiles rect elements", () => {
     const svg = `<svg><rect x="10" y="20" width="30" height="40" fill="#00ff00" /></svg>`
     const result = compileSVG(svg)
