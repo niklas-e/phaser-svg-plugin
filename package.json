@@ -29,8 +29,8 @@
     "build": "vite build && tsc --project tsconfig.build.json",
     "dev": "vite example",
     "test": "node --test 'src/**/*.test.ts'",
-    "check": "biome check src",
-    "fix": "biome check --write src",
+    "check": "biome check src example",
+    "fix": "biome check --write src example",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
