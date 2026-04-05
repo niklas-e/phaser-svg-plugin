@@ -9,7 +9,7 @@ export interface ConvertedShape {
 /**
  * Convert a supported SVG shape element to path data + resolved style.
  *
- * Supported now: path, rect
+ * Supported now: path, rect, circle
  */
 export function convertShape(
   tagName: string,
@@ -22,6 +22,8 @@ export function convertShape(
     d = attrs.d
   } else if (normalisedTag === "rect") {
     d = rectToPathData(attrs)
+  } else if (normalisedTag === "circle") {
+    d = circleToPathData(attrs)
   }
 
   if (!d) return undefined
@@ -61,6 +63,25 @@ function rectToPathData(attrs: Record<string, string>): string | undefined {
     `A ${rx} ${ry} 0 0 1 ${x} ${y2 - ry}`,
     `V ${y + ry}`,
     `A ${rx} ${ry} 0 0 1 ${x + rx} ${y}`,
+    "Z",
+  ].join(" ")
+}
+
+function circleToPathData(attrs: Record<string, string>): string | undefined {
+  const cx = parseLengthOr(attrs.cx, 0)
+  const cy = parseLengthOr(attrs.cy, 0)
+  const r = parseLength(attrs.r)
+
+  if (r === undefined || r <= 0) return undefined
+
+  const leftX = cx - r
+  const rightX = cx + r
+
+  // Circle as two half-arcs to keep command parity with SVG primitive conversion.
+  return [
+    `M ${rightX} ${cy}`,
+    `A ${r} ${r} 0 1 0 ${leftX} ${cy}`,
+    `A ${r} ${r} 0 1 0 ${rightX} ${cy}`,
     "Z",
   ].join(" ")
 }

@@ -46,7 +46,7 @@ function extractShapeElements(
   svgString: string,
 ): { tagName: string; attrs: Record<string, string> }[] {
   const elements: { tagName: string; attrs: Record<string, string> }[] = []
-  const shapeRegex = /<(path|rect)\s+([^>]*?)\s*\/?>/gi
+  const shapeRegex = /<(path|rect|circle)\s+([^>]*?)\s*\/?>/gi
 
   for (const match of svgString.matchAll(shapeRegex)) {
     const tagName = match[1]

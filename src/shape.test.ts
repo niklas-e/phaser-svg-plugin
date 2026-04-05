@@ -71,9 +71,39 @@ describe("convertShape", () => {
     )
   })
 
+  it("converts circle to two arc commands", () => {
+    const converted = convertShape("circle", {
+      cx: "12",
+      cy: "18",
+      r: "6",
+    })
+
+    assert.ok(converted)
+    assert.equal(converted.d, "M 18 18 A 6 6 0 1 0 6 18 A 6 6 0 1 0 18 18 Z")
+  })
+
+  it("returns undefined for invalid circle", () => {
+    assert.equal(
+      convertShape("circle", {
+        cx: "10",
+        cy: "10",
+      }),
+      undefined,
+    )
+
+    assert.equal(
+      convertShape("circle", {
+        cx: "10",
+        cy: "10",
+        r: "0",
+      }),
+      undefined,
+    )
+  })
+
   it("returns undefined for unsupported element", () => {
     assert.equal(
-      convertShape("circle", { cx: "10", cy: "10", r: "10" }),
+      convertShape("ellipse", { cx: "10", cy: "10", rx: "10" }),
       undefined,
     )
   })

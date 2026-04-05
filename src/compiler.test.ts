@@ -89,10 +89,23 @@ describe("compileSVG", () => {
   })
 
   it("returns empty paths for SVG with no supported shapes", () => {
-    const svg = `<svg><circle cx="10" cy="10" r="10" /></svg>`
+    const svg = `<svg><ellipse cx="10" cy="10" rx="10" ry="8" /></svg>`
     const result = compileSVG(svg)
 
     assert.equal(result.paths.length, 0)
+  })
+
+  it("compiles circle elements", () => {
+    const svg = `<svg><circle cx="12" cy="18" r="6" fill="#ff00ff" /></svg>`
+    const result = compileSVG(svg)
+
+    assert.equal(result.paths.length, 1)
+    const commands = assertDefined(result.paths[0]).commands
+    assert.equal(assertDefined(commands[0]).type, "M")
+    assert.equal(assertDefined(commands[1]).type, "A")
+    assert.equal(assertDefined(commands[2]).type, "A")
+    assert.equal(assertDefined(commands[3]).type, "Z")
+    assert.equal(assertDefined(result.paths[0]).style.fill, 0xff00ff)
   })
 
   it("compiles rect elements", () => {
