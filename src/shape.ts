@@ -57,7 +57,7 @@ function rectToPathData(attrs: Record<string, string>): string | undefined {
   const y2 = y + height
 
   if (rx <= 0 || ry <= 0) {
-    return `M ${x} ${y} H ${x2} V ${y2} H ${x} V ${y} Z`
+    return `M ${x} ${y} H ${x2} V ${y2} H ${x} Z`
   }
 
   // Rounded rectangle using four elliptical arc corners.

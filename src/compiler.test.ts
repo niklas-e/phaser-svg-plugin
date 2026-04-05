@@ -173,7 +173,6 @@ describe("compileSVG", () => {
       { type: "L", x: 40, y: 20 },
       { type: "L", x: 40, y: 60 },
       { type: "L", x: 10, y: 60 },
-      { type: "L", x: 10, y: 20 },
       { type: "Z" },
     ])
     assert.equal(path.style.fill, 0x00ff00)

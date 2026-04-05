@@ -23,7 +23,7 @@ describe("convertShape", () => {
     })
 
     assert.ok(converted)
-    assert.equal(converted.d, "M 10 20 H 40 V 60 H 10 V 20 Z")
+    assert.equal(converted.d, "M 10 20 H 40 V 60 H 10 Z")
   })
 
   it("converts rounded rect to arc path", () => {
