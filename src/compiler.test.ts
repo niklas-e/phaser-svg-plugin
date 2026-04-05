@@ -257,6 +257,30 @@ describe("compileSVG", () => {
     assert.equal(assertDefined(commands[9]).type, "Z")
   })
 
+  it("applies element rotate transform to rect geometry", () => {
+    const svg = `<svg>
+      <rect
+        x="255.285"
+        y="71.6028"
+        width="260.574"
+        height="259.766"
+        rx="30"
+        transform="rotate(45 255.285 71.6028)"
+        stroke="#3E2400"
+        stroke-width="10"
+        fill="none"
+      />
+    </svg>`
+
+    const result = compileSVG(svg)
+    const commands = assertDefined(result.paths[0]).commands
+    const move = assertDefined(commands[0])
+
+    assert.equal(move.type, "M")
+    assert.ok(Math.abs(move.x - 276.498) < 0.02)
+    assert.ok(Math.abs(move.y - 92.816) < 0.02)
+  })
+
   it("returns empty paths for empty string", () => {
     const result = compileSVG("")
     assert.equal(result.paths.length, 0)

@@ -1,5 +1,10 @@
 import Phaser from "phaser"
 import { assertDefined } from "./assert.ts"
+import {
+  parseTransform,
+  strokeScaleFromAffine,
+  transformPathCommandsAffine,
+} from "./affine-transform.ts"
 import type { CompiledSVG } from "./compiler.ts"
 import {
   drawNativeShape,
@@ -116,6 +121,12 @@ export function drawSVG(
     }
 
     let commands = parsePath(d)
+
+    const elementTransform = parseTransform(attrs.transform)
+    if (elementTransform) {
+      commands = transformPathCommandsAffine(commands, elementTransform)
+      style.strokeWidth *= strokeScaleFromAffine(elementTransform)
+    }
 
     if (transform) {
       commands = transformCommands(

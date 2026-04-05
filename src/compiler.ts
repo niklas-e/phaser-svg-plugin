@@ -1,3 +1,8 @@
+import {
+  parseTransform,
+  strokeScaleFromAffine,
+  transformPathCommandsAffine,
+} from "./affine-transform.ts"
 import { parseNativeShape, type NativeShape } from "./native-shape.ts"
 import { parsePath } from "./path-parser.ts"
 import {
@@ -49,7 +54,14 @@ export function compileSVG(svgString: string): CompiledSVG {
     if (!converted) continue
 
     const { d, style } = converted
-    const commands = parsePath(d)
+    let commands = parsePath(d)
+
+    const elementTransform = parseTransform(attrs.transform)
+    if (elementTransform) {
+      commands = transformPathCommandsAffine(commands, elementTransform)
+      style.strokeWidth *= strokeScaleFromAffine(elementTransform)
+    }
+
     paths.push({ commands, style })
 
     if (nativeShape) {
