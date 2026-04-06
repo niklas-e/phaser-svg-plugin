@@ -16,6 +16,12 @@ import {
   attrsFromElement,
   filterPresentationAttrs,
 } from "./presentation-attrs.ts"
+import {
+  clearDirtyState,
+  commitDirtyState,
+  isDirtyForState,
+  markDirtyState,
+} from "./dirty-state.ts"
 import { applyCrispPathDetailThreshold } from "./quality.ts"
 import { type RenderOptions, renderPath } from "./renderer.ts"
 import { convertShape } from "./shape.ts"
@@ -43,11 +49,11 @@ const transformedPathCache = new WeakMap<
   CompiledSVG,
   Map<string, ReadonlyArray<CompiledPath>>
 >()
+const compiledIdentityByRef = new WeakMap<CompiledSVG, number>()
+let nextCompiledIdentity = 1
 
 /**
  * Render an SVG `<path>` element's `d` attribute onto a Phaser Graphics object.
- *
- * This is the low-level API. For a higher-level approach, use the scene plugin.
  */
 export function drawSVGPath(
   graphics: Phaser.GameObjects.Graphics,
@@ -55,10 +61,40 @@ export function drawSVGPath(
   style?: Partial<SVGStyle> | undefined,
   options?: RenderOptions | undefined,
 ): void {
+  drawSVGPathInternal(graphics, d, style, options)
+}
+
+/**
+ * Boolean-return alias of `drawSVGPath`.
+ *
+ * Returns true when a draw occurred, false when skipped.
+ */
+export function drawSVGPathIfDirty(
+  graphics: Phaser.GameObjects.Graphics,
+  d: string,
+  style?: Partial<SVGStyle> | undefined,
+  options?: RenderOptions | undefined,
+): boolean {
+  return drawSVGPathInternal(graphics, d, style, options)
+}
+
+function drawSVGPathInternal(
+  graphics: Phaser.GameObjects.Graphics,
+  d: string,
+  style?: Partial<SVGStyle> | undefined,
+  options?: RenderOptions | undefined,
+): boolean {
+  const stateKey = `path|${d}|${styleStateKey(style)}|${renderOptionsStateKey(options)}`
+  if (!isDirtyForState(graphics, stateKey)) {
+    return false
+  }
+
   applyGraphicsCrispDefaults(graphics)
   const commands = parsePath(d)
   const resolved = resolveStyleWithOverrides(style)
   renderPath(graphics, commands, resolved, options)
+  commitDirtyState(graphics, stateKey)
+  return true
 }
 
 /**
@@ -69,6 +105,32 @@ export function drawSVG(
   svgString: string,
   options?: SVGPluginOptions | undefined,
 ): void {
+  drawSVGInternal(graphics, svgString, options)
+}
+
+/**
+ * Boolean-return alias of `drawSVG`.
+ *
+ * Returns true when a draw occurred, false when skipped.
+ */
+export function drawSVGIfDirty(
+  graphics: Phaser.GameObjects.Graphics,
+  svgString: string,
+  options?: SVGPluginOptions | undefined,
+): boolean {
+  return drawSVGInternal(graphics, svgString, options)
+}
+
+function drawSVGInternal(
+  graphics: Phaser.GameObjects.Graphics,
+  svgString: string,
+  options?: SVGPluginOptions | undefined,
+): boolean {
+  const stateKey = `svg|${svgString}|${pluginOptionsStateKey(options)}`
+  if (!isDirtyForState(graphics, stateKey)) {
+    return false
+  }
+
   applyGraphicsCrispDefaults(graphics)
 
   const parser = new DOMParser()
@@ -152,19 +214,45 @@ export function drawSVG(
 
     renderPath(graphics, commands, style, options)
   }
+
+  commitDirtyState(graphics, stateKey)
+  return true
 }
 
 /**
  * Render a pre-compiled SVG onto a Graphics object.
- *
- * Use with `compileSVG()` or the `phaser-svg/vite` build plugin to
- * skip runtime parsing entirely.
  */
 export function drawCompiledSVG(
   graphics: Phaser.GameObjects.Graphics,
   compiled: CompiledSVG,
   options?: SVGPluginOptions | undefined,
 ): void {
+  drawCompiledSVGInternal(graphics, compiled, options)
+}
+
+/**
+ * Boolean-return alias of `drawCompiledSVG`.
+ *
+ * Returns true when a draw occurred, false when skipped.
+ */
+export function drawCompiledSVGIfDirty(
+  graphics: Phaser.GameObjects.Graphics,
+  compiled: CompiledSVG,
+  options?: SVGPluginOptions | undefined,
+): boolean {
+  return drawCompiledSVGInternal(graphics, compiled, options)
+}
+
+function drawCompiledSVGInternal(
+  graphics: Phaser.GameObjects.Graphics,
+  compiled: CompiledSVG,
+  options?: SVGPluginOptions | undefined,
+): boolean {
+  const stateKey = `compiled|${compiledIdentity(compiled)}|${pluginOptionsStateKey(options)}`
+  if (!isDirtyForState(graphics, stateKey)) {
+    return false
+  }
+
   applyGraphicsCrispDefaults(graphics)
 
   const transform = computeTransform(compiled.viewBox, options)
@@ -191,7 +279,8 @@ export function drawCompiledSVG(
       }
     }
 
-    return
+    commitDirtyState(graphics, stateKey)
+    return true
   }
 
   const sourcePaths = transform
@@ -205,6 +294,23 @@ export function drawCompiledSVG(
 
     renderPath(graphics, path.commands, style, options)
   }
+
+  commitDirtyState(graphics, stateKey)
+  return true
+}
+
+/**
+ * Force the next dirty-aware draw call for this Graphics object to render.
+ */
+export function markSVGDirty(graphics: Phaser.GameObjects.Graphics): void {
+  markDirtyState(graphics)
+}
+
+/**
+ * Clear remembered dirty state for this Graphics object.
+ */
+export function clearSVGDirtyState(graphics: Phaser.GameObjects.Graphics): void {
+  clearDirtyState(graphics)
 }
 
 function applyStyleOverrides(
@@ -353,6 +459,93 @@ function resolveStyleWithOverrides(
   }
 }
 
+function parseViewBox(raw: string | null | undefined): ViewBox | undefined {
+  if (!raw) return undefined
+  const parts = raw.trim().split(/[\s,]+/)
+  if (parts.length !== 4) return undefined
+
+  const minX = Number(parts[0])
+  const minY = Number(parts[1])
+  const width = Number(parts[2])
+  const height = Number(parts[3])
+
+  if (
+    !Number.isFinite(minX) ||
+    !Number.isFinite(minY) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return undefined
+  }
+
+  return { minX, minY, width, height }
+}
+
+function computeTransform(
+  viewBox: ViewBox | null | undefined,
+  options: SVGPluginOptions | undefined,
+): { scale: number; tx: number; ty: number } | undefined {
+  if (!viewBox) return undefined
+  if (options?.width === undefined && options?.height === undefined) {
+    return undefined
+  }
+
+  const targetW = options.width ?? options.height ?? viewBox.width
+  const targetH = options.height ?? options.width ?? viewBox.height
+
+  return viewBoxTransform(viewBox, targetW, targetH)
+}
+
+function compiledIdentity(compiled: CompiledSVG): number {
+  const existing = compiledIdentityByRef.get(compiled)
+  if (existing !== undefined) {
+    return existing
+  }
+
+  const created = nextCompiledIdentity
+  nextCompiledIdentity += 1
+  compiledIdentityByRef.set(compiled, created)
+  return created
+}
+
+function pluginOptionsStateKey(
+  options: SVGPluginOptions | undefined,
+): string {
+  return [
+    options?.curveResolution,
+    options?.overrideFill,
+    options?.overrideStroke,
+    options?.width,
+    options?.height,
+  ].join("|")
+}
+
+function renderOptionsStateKey(
+  options: RenderOptions | undefined,
+): string {
+  return String(options?.curveResolution)
+}
+
+function styleStateKey(style: Partial<SVGStyle> | undefined): string {
+  if (!style) {
+    return ""
+  }
+
+  return [
+    style.fill,
+    style.fillAlpha,
+    style.stroke,
+    style.strokeAlpha,
+    style.strokeWidth,
+    style.lineJoin,
+    style.lineCap,
+    style.miterLimit,
+    style.opacity,
+  ].join("|")
+}
+
 /**
  * Phaser v4 Scene Plugin — adds `this.svg` to every Scene.
  *
@@ -401,6 +594,18 @@ export class SVGPlugin extends Phaser.Plugins.ScenePlugin {
     drawSVG(graphics, svgString, { ...this.defaultOptions, ...options })
   }
 
+  /** Draw an SVG string only when it changed since the last draw. */
+  drawIfDirty(
+    graphics: Phaser.GameObjects.Graphics,
+    svgString: string,
+    options?: SVGPluginOptions | undefined,
+  ): boolean {
+    return drawSVGIfDirty(graphics, svgString, {
+      ...this.defaultOptions,
+      ...options,
+    })
+  }
+
   /** Draw a single SVG path `d` attribute onto a Graphics object. */
   drawPath(
     graphics: Phaser.GameObjects.Graphics,
@@ -409,6 +614,19 @@ export class SVGPlugin extends Phaser.Plugins.ScenePlugin {
     options?: RenderOptions | undefined,
   ): void {
     drawSVGPath(graphics, d, style, { ...this.defaultOptions, ...options })
+  }
+
+  /** Draw an SVG path only when it changed since the last draw. */
+  drawPathIfDirty(
+    graphics: Phaser.GameObjects.Graphics,
+    d: string,
+    style?: Partial<SVGStyle> | undefined,
+    options?: RenderOptions | undefined,
+  ): boolean {
+    return drawSVGPathIfDirty(graphics, d, style, {
+      ...this.defaultOptions,
+      ...options,
+    })
   }
 
   /** Draw a pre-compiled SVG onto a Graphics object. */
@@ -423,46 +641,31 @@ export class SVGPlugin extends Phaser.Plugins.ScenePlugin {
     })
   }
 
+  /** Draw a compiled SVG only when it changed since the last draw. */
+  drawCompiledIfDirty(
+    graphics: Phaser.GameObjects.Graphics,
+    compiled: CompiledSVG,
+    options?: SVGPluginOptions | undefined,
+  ): boolean {
+    return drawCompiledSVGIfDirty(graphics, compiled, {
+      ...this.defaultOptions,
+      ...options,
+    })
+  }
+
+  /** Force the next dirty-aware draw call to render for this Graphics object. */
+  markDirty(graphics: Phaser.GameObjects.Graphics): this {
+    markSVGDirty(graphics)
+    return this
+  }
+
+  /** Clear remembered dirty state for this Graphics object. */
+  clearDirtyState(graphics: Phaser.GameObjects.Graphics): this {
+    clearSVGDirtyState(graphics)
+    return this
+  }
+
   destroy(): void {
     super.destroy()
   }
-}
-
-function parseViewBox(raw: string | null | undefined): ViewBox | undefined {
-  if (!raw) return undefined
-  const parts = raw.trim().split(/[\s,]+/)
-  if (parts.length !== 4) return undefined
-
-  const minX = Number(parts[0])
-  const minY = Number(parts[1])
-  const width = Number(parts[2])
-  const height = Number(parts[3])
-
-  if (
-    !Number.isFinite(minX) ||
-    !Number.isFinite(minY) ||
-    !Number.isFinite(width) ||
-    !Number.isFinite(height) ||
-    width <= 0 ||
-    height <= 0
-  ) {
-    return undefined
-  }
-
-  return { minX, minY, width, height }
-}
-
-function computeTransform(
-  viewBox: ViewBox | null | undefined,
-  options: SVGPluginOptions | undefined,
-): { scale: number; tx: number; ty: number } | undefined {
-  if (!viewBox) return undefined
-  if (options?.width === undefined && options?.height === undefined) {
-    return undefined
-  }
-
-  const targetW = options.width ?? options.height ?? viewBox.width
-  const targetH = options.height ?? options.width ?? viewBox.height
-
-  return viewBoxTransform(viewBox, targetW, targetH)
 }

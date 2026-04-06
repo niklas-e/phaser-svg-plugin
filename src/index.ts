@@ -7,9 +7,14 @@ export {
 } from "./compiler.ts"
 export { parsePath } from "./path-parser.ts"
 export {
+  clearSVGDirtyState,
+  drawCompiledSVGIfDirty,
   drawCompiledSVG,
+  drawSVGIfDirty,
   drawSVG,
+  drawSVGPathIfDirty,
   drawSVGPath,
+  markSVGDirty,
   SVGPlugin,
   type SVGPluginOptions,
 } from "./plugin.ts"
