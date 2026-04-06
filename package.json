@@ -1,5 +1,5 @@
 {
-  "name": "phaser-svg",
+  "name": "phaser-svg-plugin",
   "version": "0.1.0",
   "description": "Phaser plugin to render SVGs as native Graphics draw calls",
   "type": "module",
@@ -31,7 +31,9 @@
     "test": "node --test 'src/**/*.test.ts'",
     "check": "biome check src example",
     "fix": "biome check --write src example",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pack:check": "npm pack --dry-run --json | node scripts/pack-check.mjs",
+    "release:check": "npm run typecheck && npm test && npm run build && npm run check && npm run pack:check"
   },
   "keywords": [
     "phaser",
