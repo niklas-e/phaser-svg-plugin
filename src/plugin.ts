@@ -16,6 +16,7 @@ import {
   attrsFromElement,
   filterPresentationAttrs,
 } from "./presentation-attrs.ts"
+import { applyCrispPathDetailThreshold } from "./quality.ts"
 import { type RenderOptions, renderPath } from "./renderer.ts"
 import { convertShape } from "./shape.ts"
 import { isInsideNonRenderableContainer } from "./svg-structure.ts"
@@ -45,6 +46,7 @@ export function drawSVGPath(
   style?: Partial<SVGStyle> | undefined,
   options?: RenderOptions | undefined,
 ): void {
+  applyGraphicsCrispDefaults(graphics)
   const commands = parsePath(d)
   const resolved = resolveStyleWithOverrides(style)
   renderPath(graphics, commands, resolved, options)
@@ -58,6 +60,8 @@ export function drawSVG(
   svgString: string,
   options?: SVGPluginOptions | undefined,
 ): void {
+  applyGraphicsCrispDefaults(graphics)
+
   const parser = new DOMParser()
   const doc = parser.parseFromString(svgString, "image/svg+xml")
 
@@ -152,6 +156,8 @@ export function drawCompiledSVG(
   compiled: CompiledSVG,
   options?: SVGPluginOptions | undefined,
 ): void {
+  applyGraphicsCrispDefaults(graphics)
+
   const transform = computeTransform(compiled.viewBox, options)
 
   const items = compiled.items
@@ -219,12 +225,17 @@ export function drawCompiledSVG(
         transform.scale,
         transform.tx,
         transform.ty,
-      )
-      resolved.strokeWidth *= transform.scale
-    }
+interface PhaserRendererLike {
+  config?: { pathDetailThreshold?: number | undefined } | undefined
+}
 
-    renderPath(graphics, commands, resolved, options)
-  }
+function applyGraphicsCrispDefaults(
+  graphics: Phaser.GameObjects.Graphics,
+): void {
+  const renderer = graphics.scene?.sys?.game?.renderer as
+    | PhaserRendererLike
+    | undefined
+  applyCrispPathDetailThreshold(renderer?.config)
 }
 
 function resolveStyleWithOverrides(

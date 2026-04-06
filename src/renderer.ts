@@ -6,10 +6,11 @@ import {
   computeMiterJoin,
   type Point2D,
 } from "./line-join.ts"
+import { resolveCurveResolution } from "./quality.ts"
 import type { PathCommand, SVGStyle } from "./types.ts"
 
 export interface RenderOptions {
-  /** Points per curve segment for tessellation (default 16). */
+  /** Points per curve segment for tessellation. */
   curveResolution?: number | undefined
 }
 
@@ -138,15 +139,7 @@ function renderComplexPath(
   strokeAlpha: number,
   options?: RenderOptions | undefined,
 ): void {
-  const resolution = options?.curveResolution ?? 16
-
-  const subpathCmds = splitSubpaths(commands)
-
-  interface TessellatedSubpath {
-    points: Point2D[]
-    closed: boolean
-  }
-
+  const resolution = resolveCurveResolution(options)
   const tessellated: TessellatedSubpath[] = []
 
   for (const subpath of subpathCmds) {
