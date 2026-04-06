@@ -17,6 +17,13 @@ export function isDirtyForState(target: object, stateKey: string): boolean {
 }
 
 /**
+ * Return true when the target has a previously committed draw state.
+ */
+export function hasCommittedDirtyState(target: object): boolean {
+  return lastStateByTarget.has(target)
+}
+
+/**
  * Commit the current draw state after a successful render.
  */
 export function commitDirtyState(target: object, stateKey: string): void {

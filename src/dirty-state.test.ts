@@ -3,6 +3,7 @@ import { describe, it } from "node:test"
 import {
   clearDirtyState,
   commitDirtyState,
+  hasCommittedDirtyState,
   isDirtyForState,
   markDirtyState,
 } from "./dirty-state.ts"
@@ -47,5 +48,16 @@ describe("dirty-state", () => {
     commitDirtyState(target, "state:a")
     clearDirtyState(target)
     assert.equal(isDirtyForState(target, "state:a"), true)
+  })
+
+  it("reports committed state presence", () => {
+    const target = {}
+    assert.equal(hasCommittedDirtyState(target), false)
+
+    commitDirtyState(target, "state:a")
+    assert.equal(hasCommittedDirtyState(target), true)
+
+    clearDirtyState(target)
+    assert.equal(hasCommittedDirtyState(target), false)
   })
 })

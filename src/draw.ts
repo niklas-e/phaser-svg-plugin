@@ -18,6 +18,7 @@ import {
 import {
   clearDirtyState,
   commitDirtyState,
+  hasCommittedDirtyState,
   isDirtyForState,
   markDirtyState,
 } from "./dirty-state.ts"
@@ -88,6 +89,10 @@ function drawSVGPathInternal(
     return false
   }
 
+  if (hasCommittedDirtyState(graphics)) {
+    graphics.clear()
+  }
+
   applyGraphicsCrispDefaults(graphics)
   const commands = parsePath(d)
   const resolved = resolveStyleWithOverrides(style)
@@ -128,6 +133,10 @@ function drawSVGInternal(
   const stateKey = `svg|${svgString}|${pluginOptionsStateKey(options)}`
   if (!isDirtyForState(graphics, stateKey)) {
     return false
+  }
+
+  if (hasCommittedDirtyState(graphics)) {
+    graphics.clear()
   }
 
   applyGraphicsCrispDefaults(graphics)
@@ -252,6 +261,10 @@ function drawCompiledSVGInternal(
     return false
   }
 
+  if (hasCommittedDirtyState(graphics)) {
+    graphics.clear()
+  }
+
   applyGraphicsCrispDefaults(graphics)
 
   const transform = computeTransform(compiled.viewBox, options)
@@ -308,7 +321,9 @@ export function markSVGDirty(graphics: Phaser.GameObjects.Graphics): void {
 /**
  * Clear remembered dirty state for this Graphics object.
  */
-export function clearSVGDirtyState(graphics: Phaser.GameObjects.Graphics): void {
+export function clearSVGDirtyState(
+  graphics: Phaser.GameObjects.Graphics,
+): void {
   clearDirtyState(graphics)
 }
 
@@ -509,9 +524,7 @@ function compiledIdentity(compiled: CompiledSVG): number {
   return created
 }
 
-function pluginOptionsStateKey(
-  options: SVGPluginOptions | undefined,
-): string {
+function pluginOptionsStateKey(options: SVGPluginOptions | undefined): string {
   return [
     options?.curveResolution,
     options?.overrideFill,
@@ -521,9 +534,7 @@ function pluginOptionsStateKey(
   ].join("|")
 }
 
-function renderOptionsStateKey(
-  options: RenderOptions | undefined,
-): string {
+function renderOptionsStateKey(options: RenderOptions | undefined): string {
   return String(options?.curveResolution)
 }
 
