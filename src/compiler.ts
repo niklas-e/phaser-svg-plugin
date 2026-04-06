@@ -49,6 +49,7 @@ export function compileSVG(svgString: string): CompiledSVG {
 
   for (const { tagName, attrs } of elements) {
     const styleAttrs = { ...inheritedStyleAttrs, ...attrs }
+    const elementTransform = parseTransform(attrs.transform)
     const nativeShape = parseNativeShape(tagName, attrs)
     const converted = convertShape(tagName, styleAttrs)
     if (!converted) continue
@@ -56,7 +57,6 @@ export function compileSVG(svgString: string): CompiledSVG {
     const { d, style } = converted
     let commands = parsePath(d)
 
-    const elementTransform = parseTransform(attrs.transform)
     if (elementTransform) {
       commands = transformPathCommandsAffine(commands, elementTransform)
       style.strokeWidth *= strokeScaleFromAffine(elementTransform)
@@ -64,7 +64,7 @@ export function compileSVG(svgString: string): CompiledSVG {
 
     paths.push({ commands, style })
 
-    if (nativeShape) {
+    if (nativeShape && !elementTransform) {
       items.push({ kind: "native", shape: nativeShape, style })
     } else {
       items.push({ kind: "path", commands, style })

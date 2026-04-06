@@ -76,11 +76,12 @@ export function drawSVG(
     }
 
     const attrs = attrsFromElement(shapeEl)
+    const elementTransform = parseTransform(attrs.transform)
 
     const styleAttrs = { ...inheritedStyleAttrs, ...attrs }
 
     const nativeShape = parseNativeShape(shapeEl.tagName, attrs)
-    if (nativeShape) {
+    if (nativeShape && !elementTransform) {
       const style = resolveStyle(styleAttrs)
 
       if (options?.overrideFill !== undefined) {
@@ -121,8 +122,6 @@ export function drawSVG(
     }
 
     let commands = parsePath(d)
-
-    const elementTransform = parseTransform(attrs.transform)
     if (elementTransform) {
       commands = transformPathCommandsAffine(commands, elementTransform)
       style.strokeWidth *= strokeScaleFromAffine(elementTransform)

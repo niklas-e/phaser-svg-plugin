@@ -188,6 +188,25 @@ describe("compileSVG", () => {
     }
   })
 
+  it("applies element transform to circle geometry", () => {
+    const svg = `<svg>
+      <circle cx="10" cy="10" r="4" transform="translate(5 7)" fill="#ff00ff" />
+    </svg>`
+
+    const result = compileSVG(svg)
+    assert.equal(result.paths.length, 1)
+    assert.equal(result.items.length, 1)
+
+    const path = assertDefined(result.paths[0])
+    const move = assertDefined(path.commands[0])
+    assert.equal(move.type, "M")
+    assert.ok(Math.abs(move.x - 19) < 0.001)
+    assert.ok(Math.abs(move.y - 17) < 0.001)
+
+    const item = assertDefined(result.items[0])
+    assert.equal(item.kind, "path")
+  })
+
   it("inherits root fill='none' for stroke-only circle", () => {
     const svg = `<svg fill="none"><circle cx="33.5" cy="33.5" r="26" stroke="#3E2400" stroke-width="15" /></svg>`
     const result = compileSVG(svg)
