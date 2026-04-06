@@ -1,0 +1,44 @@
+name: Regression report
+description: Report behavior that worked before and broke in a newer version
+title: "regression: "
+labels:
+  - bug
+  - regression
+body:
+  - type: input
+    id: good
+    attributes:
+      label: Last known good version
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: bad
+    attributes:
+      label: First known bad version
+      placeholder: 0.2.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: change
+    attributes:
+      label: Observed regression
+      description: What changed unexpectedly?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Steps, repo, or code snippet to reproduce.
+    validations:
+      required: true
+
+  - type: textarea
+    id: migration
+    attributes:
+      label: Migration attempt
+      description: If this came from a minor update, what migration guidance did you follow?

@@ -1,0 +1,72 @@
+name: Bug report
+description: Report a bug in runtime, compile-time, or rendering behavior
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is wrong and what did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Minimal repro steps or code sample.
+      placeholder: |
+        1. Install version ...
+        2. Call ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: svg
+    attributes:
+      label: SVG sample
+      description: Include the smallest SVG that reproduces the issue.
+
+  - type: input
+    id: version
+    attributes:
+      label: phaser-svg version
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: phaser
+    attributes:
+      label: Phaser version
+      placeholder: 4.0.0-rc.7
+    validations:
+      required: true
+
+  - type: input
+    id: vite
+    attributes:
+      label: Vite version
+      placeholder: 8.x
+
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      placeholder: 22.x
+
+  - type: dropdown
+    id: path
+    attributes:
+      label: Affected path
+      options:
+        - runtime drawSVG
+        - runtime drawSVGPath
+        - precompiled drawCompiledSVG
+        - vite plugin compile
+        - scene plugin usage
+    validations:
+      required: true
