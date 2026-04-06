@@ -1,9 +1,41 @@
 # phaser-svg
 
-Render SVG `<path>` elements as native Phaser 4 Graphics draw calls.
+> ⚠️ DISCLAIMER: this plugin is currently in [alpha phase](#alpha-status)
+
+Render SVG elements as native Phaser 4 Graphics draw calls.
 
 Paths are parsed, styled and tessellated so they can be drawn directly on a
 `Phaser.GameObjects.Graphics` object - no textures, no DOM nodes at runtime.
+
+Draw calls are also dirty-aware by default: repeated calls with unchanged
+source/options on the same `Graphics` object are skipped automatically.
+
+## Alpha status
+
+This package is currently in alpha.
+
+- It may contain bugs and edge-case rendering issues.
+- Frequent breaking changes are expected while the API is still being refined.
+- Breaking changes will be published as semver **minor** updates.
+- Semver **patch** updates are intended to remain non-breaking.
+
+## Release policy
+
+While this project is in alpha, versioning is intentionally pragmatic:
+
+- **Patch** (`x.y.Z`) is for bug fixes and non-breaking improvements.
+- **Minor** (`x.Y.z`) may include breaking API, behavior, or output changes.
+- Breaking changes are documented in [CHANGELOG.md](CHANGELOG.md).
+- When possible, migration notes are included for minor releases.
+
+Release preparation docs:
+
+- Checklist: [docs/release/alpha-release-checklist.md](docs/release/alpha-release-checklist.md)
+- Migration notes template: [docs/release/migration-notes-template.md](docs/release/migration-notes-template.md)
+- Compatibility matrix: [docs/compatibility-matrix.md](docs/compatibility-matrix.md)
+- API stability map: [docs/api-surface.md](docs/api-surface.md)
+- Visual regression strategy: [docs/visual-regression.md](docs/visual-regression.md)
+- Performance baseline log: [docs/performance-baseline.md](docs/performance-baseline.md)
 
 ## Install
 
@@ -78,6 +110,41 @@ class MyScene extends Phaser.Scene {
 }
 ```
 
+For repeated updates, regular draw calls already skip unchanged redraws:
+
+```ts
+import { drawCompiledSVG, markSVGDirty } from "phaser-svg"
+import heart from "./heart.svg"
+
+class MyScene extends Phaser.Scene {
+  private pulse = 0
+
+  create() {
+    const graphics = this.add.graphics()
+
+    // First draw always renders.
+    drawCompiledSVG(graphics, heart, { width: 96, height: 96 })
+
+    this.events.on("update", () => {
+      // Redraw only when your visual state actually changed.
+      const nextPulse = Math.floor(this.time.now / 250)
+      if (nextPulse !== this.pulse) {
+        this.pulse = nextPulse
+
+        graphics.clear()
+        markSVGDirty(graphics) // clear() happened outside plugin; mark dirty
+
+        drawCompiledSVG(graphics, heart, {
+          width: 96,
+          height: 96,
+          overrideFill: this.pulse % 2 === 0 ? 0xffcc00 : 0xff7a00,
+        })
+      }
+    })
+  }
+}
+```
+
 To get TypeScript types for `.svg` imports, add a reference in any `.d.ts` file
 in your project (or in `tsconfig.json` types):
 
@@ -144,9 +211,14 @@ this.svg.setDefaults({
 
 | Function | Description |
 | --- | --- |
-| `drawSVG(graphics, svgString, options?)` | Parse and render a full SVG string |
-| `drawSVGPath(graphics, d, style?, options?)` | Parse and render a single path `d` attribute |
-| `drawCompiledSVG(graphics, compiled, options?)` | Render pre-compiled SVG data (no parsing) |
+| `drawSVG(graphics, svgString, options?)` | Parse and render a full SVG string (auto-skips unchanged redraws) |
+| `drawSVGIfDirty(graphics, svgString, options?)` | Boolean-return alias of `drawSVG`; returns `true` if rendered |
+| `drawSVGPath(graphics, d, style?, options?)` | Parse and render a single path `d` attribute (auto-skips unchanged redraws) |
+| `drawSVGPathIfDirty(graphics, d, style?, options?)` | Boolean-return alias of `drawSVGPath`; returns `true` if rendered |
+| `drawCompiledSVG(graphics, compiled, options?)` | Render pre-compiled SVG data (auto-skips unchanged redraws) |
+| `drawCompiledSVGIfDirty(graphics, compiled, options?)` | Boolean-return alias of `drawCompiledSVG`; returns `true` if rendered |
+| `markSVGDirty(graphics)` | Force the next dirty-aware draw call to render |
+| `clearSVGDirtyState(graphics)` | Clear remembered dirty state for a Graphics object |
 
 ### Compilation
 
@@ -172,6 +244,14 @@ this.svg.setDefaults({
 | `curveResolution` | `number` | Points per curve for tessellation (default `32`) |
 | `overrideFill` | `number` | Force fill colour for all shapes |
 | `overrideStroke` | `number` | Force stroke colour for all shapes |
+
+For small UI icons, the plugin automatically disables Phaser Graphics path
+simplification for plugin draw calls to preserve detail.
+
+Dirty redraw skipping is enabled by default. It only skips redraws when inputs
+are unchanged, and it does not detect external mutations automatically. If you call
+`graphics.clear()` (or otherwise mutate the Graphics outside plugin draw calls),
+call `markSVGDirty(graphics)` before your next dirty-aware draw.
 
 **`SVGStyle`** - resolved style for a single path:
 
@@ -201,7 +281,3 @@ this.svg.setDefaults({
 ### Colour formats
 
 `#rrggbb` `#rgb` `rgb(r,g,b)` `rgba(r,g,b,a)` named colours (`red`, `blue`, etc.) `none` `transparent`
-
-## License
-
-MIT
