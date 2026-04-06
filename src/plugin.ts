@@ -5,7 +5,7 @@ import {
   strokeScaleFromAffine,
   transformPathCommandsAffine,
 } from "./affine-transform.ts"
-import type { CompiledSVG } from "./compiler.ts"
+import type { CompiledItem, CompiledPath, CompiledSVG } from "./compiler.ts"
 import {
   drawNativeShape,
   parseNativeShape,
@@ -34,6 +34,15 @@ export interface SVGPluginOptions extends RenderOptions {
   /** Target height — scales the SVG viewBox to fit. */
   height?: number | undefined
 }
+
+const transformedItemCache = new WeakMap<
+  CompiledSVG,
+  Map<string, ReadonlyArray<CompiledItem>>
+>()
+const transformedPathCache = new WeakMap<
+  CompiledSVG,
+  Map<string, ReadonlyArray<CompiledPath>>
+>()
 
 /**
  * Render an SVG `<path>` element's `d` attribute onto a Phaser Graphics object.
@@ -159,72 +168,162 @@ export function drawCompiledSVG(
   applyGraphicsCrispDefaults(graphics)
 
   const transform = computeTransform(compiled.viewBox, options)
+  const overrideFill = options?.overrideFill
+  const overrideStroke = options?.overrideStroke
+  const hasOverrides =
+    overrideFill !== undefined || overrideStroke !== undefined
 
   const items = compiled.items
   if (Array.isArray(items) && items.length > 0) {
-    for (const item of items) {
-      const resolved = { ...item.style }
+    const sourceItems = transform
+      ? getTransformedItems(compiled, transform)
+      : items
 
-      if (options?.overrideFill !== undefined) {
-        resolved.fill = options.overrideFill
-      }
-      if (options?.overrideStroke !== undefined) {
-        resolved.stroke = options.overrideStroke
-      }
+    for (const item of sourceItems) {
+      const style = hasOverrides
+        ? applyStyleOverrides(item.style, overrideFill, overrideStroke)
+        : item.style
 
       if (item.kind === "native") {
-        const shape =
-          transform === undefined
-            ? item.shape
-            : transformNativeShape(
-                item.shape,
-                transform.scale,
-                transform.tx,
-                transform.ty,
-              )
-
-        if (transform) {
-          resolved.strokeWidth *= transform.scale
-        }
-
-        drawNativeShape(graphics, shape, resolved)
-        continue
+        drawNativeShape(graphics, item.shape, style)
+      } else {
+        renderPath(graphics, item.commands, style, options)
       }
-
-      let commands = item.commands
-      if (transform) {
-        commands = transformCommands(
-          commands,
-          transform.scale,
-          transform.tx,
-          transform.ty,
-        )
-        resolved.strokeWidth *= transform.scale
-      }
-
-      renderPath(graphics, commands, resolved, options)
     }
 
     return
   }
 
-  for (const { commands: rawCmds, style: rawStyle } of compiled.paths) {
-    const resolved = { ...rawStyle }
+  const sourcePaths = transform
+    ? getTransformedPaths(compiled, transform)
+    : compiled.paths
 
-    if (options?.overrideFill !== undefined) {
-      resolved.fill = options.overrideFill
-    }
-    if (options?.overrideStroke !== undefined) {
-      resolved.stroke = options.overrideStroke
+  for (const path of sourcePaths) {
+    const style = hasOverrides
+      ? applyStyleOverrides(path.style, overrideFill, overrideStroke)
+      : path.style
+
+    renderPath(graphics, path.commands, style, options)
+  }
+}
+
+function applyStyleOverrides(
+  style: SVGStyle,
+  overrideFill: number | undefined,
+  overrideStroke: number | undefined,
+): SVGStyle {
+  if (overrideFill === undefined && overrideStroke === undefined) {
+    return style
+  }
+
+  const resolved = { ...style }
+
+  if (overrideFill !== undefined) {
+    resolved.fill = overrideFill
+  }
+
+  if (overrideStroke !== undefined) {
+    resolved.stroke = overrideStroke
+  }
+
+  return resolved
+}
+
+function getTransformedItems(
+  compiled: CompiledSVG,
+  transform: { scale: number; tx: number; ty: number },
+): ReadonlyArray<CompiledItem> {
+  let byTransform = transformedItemCache.get(compiled)
+  if (!byTransform) {
+    byTransform = new Map<string, ReadonlyArray<CompiledItem>>()
+    transformedItemCache.set(compiled, byTransform)
+  }
+
+  const key = transformKey(transform)
+  const cached = byTransform.get(key)
+  if (cached) {
+    return cached
+  }
+
+  const scaledItems = compiled.items.map((item) => {
+    if (item.kind === "native") {
+      return {
+        kind: "native" as const,
+        shape: transformNativeShape(
+          item.shape,
+          transform.scale,
+          transform.tx,
+          transform.ty,
+        ),
+        style: scaleStyleStroke(item.style, transform.scale),
+      }
     }
 
-    let commands = rawCmds
-    if (transform) {
-      commands = transformCommands(
-        commands,
+    return {
+      kind: "path" as const,
+      commands: transformCommands(
+        item.commands,
         transform.scale,
         transform.tx,
         transform.ty,
+      ),
+      style: scaleStyleStroke(item.style, transform.scale),
+    }
+  })
+
+  byTransform.set(key, scaledItems)
+  return scaledItems
+}
+
+function getTransformedPaths(
+  compiled: CompiledSVG,
+  transform: { scale: number; tx: number; ty: number },
+): ReadonlyArray<CompiledPath> {
+  let byTransform = transformedPathCache.get(compiled)
+  if (!byTransform) {
+    byTransform = new Map<string, ReadonlyArray<CompiledPath>>()
+    transformedPathCache.set(compiled, byTransform)
+  }
+
+  const key = transformKey(transform)
+  const cached = byTransform.get(key)
+  if (cached) {
+    return cached
+  }
+
+  const scaledPaths = compiled.paths.map((path) => ({
+    commands: transformCommands(
+      path.commands,
+      transform.scale,
+      transform.tx,
+      transform.ty,
+    ),
+    style: scaleStyleStroke(path.style, transform.scale),
+  }))
+
+  byTransform.set(key, scaledPaths)
+  return scaledPaths
+}
+
+function scaleStyleStroke(style: SVGStyle, scale: number): SVGStyle {
+  if (scale === 1) {
+    return style
+  }
+
+  return {
+    ...style,
+    strokeWidth: style.strokeWidth * scale,
+  }
+}
+
+function transformKey(transform: {
+  scale: number
+  tx: number
+  ty: number
+}): string {
+  return `${transform.scale}|${transform.tx}|${transform.ty}`
+}
+
 interface PhaserRendererLike {
   config?: { pathDetailThreshold?: number | undefined } | undefined
 }

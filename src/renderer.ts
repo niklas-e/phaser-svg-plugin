@@ -14,14 +14,42 @@ export interface RenderOptions {
   curveResolution?: number | undefined
 }
 
+interface SimpleSubpath {
+  points: Point2D[]
+  closed: boolean
+}
+
+interface TessellatedSubpath {
+  points: Point2D[]
+  closed: boolean
+}
+
+const SIMPLE_PATH_KIND_CACHE = new WeakMap<PathCommand[], boolean>()
+const SIMPLE_SUBPATH_CACHE = new WeakMap<
+  PathCommand[],
+  ReadonlyArray<SimpleSubpath>
+>()
+const TESSELLATED_SUBPATH_CACHE = new WeakMap<
+  PathCommand[],
+  Map<number, ReadonlyArray<TessellatedSubpath>>
+>()
+
 /**
  * Return true if the command list contains only simple commands
  * (M, L, Z) that can be drawn directly on Graphics without curves.
  */
 function isSimplePath(commands: PathCommand[]): boolean {
-  return commands.every(
+  const cached = SIMPLE_PATH_KIND_CACHE.get(commands)
+  if (cached !== undefined) {
+    return cached
+  }
+
+  const isSimple = commands.every(
     (c) => c.type === "M" || c.type === "L" || c.type === "Z",
   )
+  SIMPLE_PATH_KIND_CACHE.set(commands, isSimple)
+
+  return isSimple
 }
 
 /**
@@ -69,30 +97,7 @@ function renderSimplePath(
   fillAlpha: number,
   strokeAlpha: number,
 ): void {
-  // Split into subpaths for compound fill (handles holes via bridged polygons)
-  const subpaths = splitSubpaths(commands)
-
-  interface SimpleSubpath {
-    points: Point2D[]
-    closed: boolean
-  }
-
-  const tessellated: SimpleSubpath[] = []
-
-  for (const subpath of subpaths) {
-    const points: Point2D[] = []
-    let closed = false
-    for (const cmd of subpath) {
-      if (cmd.type === "Z") {
-        closed = true
-      } else if ("x" in cmd && "y" in cmd) {
-        points.push(cmd)
-      }
-    }
-    if (points.length > 0) {
-      tessellated.push({ points, closed })
-    }
-  }
+  const tessellated = getSimpleSubpaths(commands)
 
   if (tessellated.length === 0) return
 
@@ -140,6 +145,88 @@ function renderComplexPath(
   options?: RenderOptions | undefined,
 ): void {
   const resolution = resolveCurveResolution(options)
+  const tessellated = getTessellatedSubpaths(commands, resolution)
+
+  if (tessellated.length === 0) return
+
+  // Fill using bridged polygons so compound paths with holes render
+  // correctly (Phaser's WebGL pipeline doesn't honour winding rules).
+  if (style.fill !== null && tessellated.some((s) => s.closed)) {
+    fillCompoundPath(graphics, tessellated, style, fillAlpha)
+  }
+
+  // Stroke: draw each subpath outline individually
+  if (style.stroke !== null) {
+    graphics.lineStyle(style.strokeWidth, style.stroke, strokeAlpha)
+
+    for (const { points, closed } of tessellated) {
+      graphics.beginPath()
+      const start = assertDefined(points[0])
+      graphics.moveTo(start.x, start.y)
+      for (let j = 1; j < points.length; j++) {
+        const pt = assertDefined(points[j])
+        graphics.lineTo(pt.x, pt.y)
+      }
+      if (closed) {
+        graphics.closePath()
+      }
+      graphics.strokePath()
+    }
+  }
+
+  // Line joins / caps per subpath
+  for (const { points, closed } of tessellated) {
+    drawLineJoins(graphics, points, closed, style, strokeAlpha)
+  }
+}
+
+function getSimpleSubpaths(
+  commands: PathCommand[],
+): ReadonlyArray<SimpleSubpath> {
+  const cached = SIMPLE_SUBPATH_CACHE.get(commands)
+  if (cached) {
+    return cached
+  }
+
+  // Split into subpaths for compound fill (handles holes via bridged polygons)
+  const subpaths = splitSubpaths(commands)
+  const tessellated: SimpleSubpath[] = []
+
+  for (const subpath of subpaths) {
+    const points: Point2D[] = []
+    let closed = false
+    for (const cmd of subpath) {
+      if (cmd.type === "Z") {
+        closed = true
+      } else if ("x" in cmd && "y" in cmd) {
+        points.push(cmd)
+      }
+    }
+    if (points.length > 0) {
+      tessellated.push({ points, closed })
+    }
+  }
+
+  SIMPLE_SUBPATH_CACHE.set(commands, tessellated)
+  return tessellated
+}
+
+function getTessellatedSubpaths(
+  commands: PathCommand[],
+  resolution: number,
+): ReadonlyArray<TessellatedSubpath> {
+  let byResolution = TESSELLATED_SUBPATH_CACHE.get(commands)
+  if (!byResolution) {
+    byResolution = new Map<number, ReadonlyArray<TessellatedSubpath>>()
+    TESSELLATED_SUBPATH_CACHE.set(commands, byResolution)
+  }
+
+  const cached = byResolution.get(resolution)
+  if (cached) {
+    return cached
+  }
+
+  const subpathCmds = splitSubpaths(commands)
   const tessellated: TessellatedSubpath[] = []
 
   for (const subpath of subpathCmds) {
@@ -214,37 +301,8 @@ function renderComplexPath(
     }
   }
 
-  if (tessellated.length === 0) return
-
-  // Fill using bridged polygons so compound paths with holes render
-  // correctly (Phaser's WebGL pipeline doesn't honour winding rules).
-  if (style.fill !== null && tessellated.some((s) => s.closed)) {
-    fillCompoundPath(graphics, tessellated, style, fillAlpha)
-  }
-
-  // Stroke: draw each subpath outline individually
-  if (style.stroke !== null) {
-    graphics.lineStyle(style.strokeWidth, style.stroke, strokeAlpha)
-
-    for (const { points, closed } of tessellated) {
-      graphics.beginPath()
-      const start = assertDefined(points[0])
-      graphics.moveTo(start.x, start.y)
-      for (let j = 1; j < points.length; j++) {
-        const pt = assertDefined(points[j])
-        graphics.lineTo(pt.x, pt.y)
-      }
-      if (closed) {
-        graphics.closePath()
-      }
-      graphics.strokePath()
-    }
-  }
-
-  // Line joins / caps per subpath
-  for (const { points, closed } of tessellated) {
-    drawLineJoins(graphics, points, closed, style, strokeAlpha)
-  }
+  byResolution.set(resolution, tessellated)
+  return tessellated
 }
 
 // ---------------------------------------------------------------------------
