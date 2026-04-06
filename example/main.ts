@@ -2,6 +2,7 @@
 
 import Phaser from "phaser"
 import { drawSVG } from "../src/index.ts"
+import { installBenchmarkPanel, type BenchmarkFixture } from "./benchmark.ts"
 
 import triangleSvg from "./svg/triangle.svg?raw"
 import cubicBezierSvg from "./svg/cubic-bezier.svg?raw"
@@ -80,6 +81,7 @@ const testCases: TestCase[] = [
 ]
 
 const container = assertDefined(document.getElementById("comparisons"))
+const benchmarkFixtures: BenchmarkFixture[] = []
 
 for (const tc of testCases) {
   const slug = tc.title.replace(/\W+/g, "-").toLowerCase()
@@ -168,6 +170,16 @@ for (const tc of testCases) {
   const svg = tc.svg
   const logicalW = tc.width
   const logicalH = tc.height
+
+  benchmarkFixtures.push({
+    title: tc.title,
+    slug,
+    svg,
+    width: logicalW,
+    height: logicalH,
+    pluginParentId: phaserParentId,
+    vanillaParentId: vanillaPhaserParentId,
+  })
 
   // -- Shared: rasterize SVG string to an Image at DPR resolution -----------
   function rasterizeSVG(
@@ -407,3 +419,5 @@ for (const tc of testCases) {
   }
   watchDpr()
 }
+
+installBenchmarkPanel(benchmarkFixtures)

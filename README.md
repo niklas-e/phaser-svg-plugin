@@ -43,6 +43,25 @@ Release preparation docs:
 npm install phaser-svg phaser
 ```
 
+## Benchmarking crispness and performance
+
+Use the example app benchmark runner to generate repeatable numbers for:
+
+- crispness/fidelity versus browser-native SVG raster output
+- plugin CPU draw scenarios (runtime, precompiled, dirty-skip, dirty-redraw)
+- texture-first preparation cost (SVG decode+rasterize, canvas blit)
+
+Steps:
+
+1. Run `npm run dev`
+2. Open the example page in your browser
+3. Use the **Benchmark Runner** panel at the top
+4. Click **Run Benchmarks**
+5. Copy the JSON report with **Copy JSON**
+
+The output includes `baselineRows`, which maps directly to
+[docs/performance-baseline.md](docs/performance-baseline.md) scenarios.
+
 ## Usage
 
 There are three ways to use phaser-svg, depending on when you want the SVG

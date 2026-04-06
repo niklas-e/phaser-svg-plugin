@@ -16,6 +16,22 @@ Track changes over time to detect regressions.
 3. Record median across at least 30 iterations per case.
 4. Include frame-time impact and memory trend if available.
 
+## Automated runner (example app)
+
+The example page includes a **Benchmark Runner** panel that outputs JSON.
+
+1. Run `npm run dev`
+2. Open the example page
+3. Run the benchmark
+4. Copy the JSON output
+
+Use `baselineRows` from the JSON report to fill the table below:
+
+- `runtime first draw`
+- `precompiled first draw`
+- `unchanged redraw skip`
+- `dirty redraw clear+draw`
+
 ## Baseline table
 
 | Date | Version | Scenario | Median ms | Notes |
