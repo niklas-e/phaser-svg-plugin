@@ -49,6 +49,7 @@ const transformedPathCache = new WeakMap<
   CompiledSVG,
   Map<string, ReadonlyArray<CompiledPath>>
 >()
+const styleOverrideCache = new WeakMap<SVGStyle, Map<string, SVGStyle>>()
 const compiledIdentityByRef = new WeakMap<CompiledSVG, number>()
 let nextCompiledIdentity = 1
 
@@ -336,6 +337,18 @@ function applyStyleOverrides(
     return style
   }
 
+  let byOverride = styleOverrideCache.get(style)
+  if (!byOverride) {
+    byOverride = new Map<string, SVGStyle>()
+    styleOverrideCache.set(style, byOverride)
+  }
+
+  const cacheKey = `${overrideFill ?? "_"}|${overrideStroke ?? "_"}`
+  const cached = byOverride.get(cacheKey)
+  if (cached) {
+    return cached
+  }
+
   const resolved = { ...style }
 
   if (overrideFill !== undefined) {
@@ -345,6 +358,8 @@ function applyStyleOverrides(
   if (overrideStroke !== undefined) {
     resolved.stroke = overrideStroke
   }
+
+  byOverride.set(cacheKey, resolved)
 
   return resolved
 }

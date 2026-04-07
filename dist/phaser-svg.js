@@ -500,28 +500,28 @@ function R(e, t, n, r) {
 }
 //#endregion
 //#region src/draw.ts
-var z = /* @__PURE__ */ new WeakMap(), B = /* @__PURE__ */ new WeakMap(), V = /* @__PURE__ */ new WeakMap(), H = 1;
-function U(e, t, n, r) {
-	W(e, t, n, r);
+var z = /* @__PURE__ */ new WeakMap(), B = /* @__PURE__ */ new WeakMap(), V = /* @__PURE__ */ new WeakMap(), H = /* @__PURE__ */ new WeakMap(), U = 1;
+function W(e, t, n, r) {
+	K(e, t, n, r);
 }
-function _e(e, t, n, r) {
-	return W(e, t, n, r);
+function G(e, t, n, r) {
+	return K(e, t, n, r);
 }
-function W(e, n, r, i) {
-	let a = `path|${n}|${ke(r)}|${Oe(i)}`;
-	return y(e, a) ? (b(e) && e.clear(), Q(e), M(e, t(n), we(r), i), x(e, a), !0) : !1;
+function K(e, n, r, i) {
+	let a = `path|${n}|${Ae(r)}|${ke(i)}`;
+	return y(e, a) ? (b(e) && e.clear(), Q(e), M(e, t(n), Te(r), i), x(e, a), !0) : !1;
 }
-function G(e, t, n) {
-	q(e, t, n);
+function q(e, t, n) {
+	Y(e, t, n);
 }
-function K(e, t, n) {
-	return q(e, t, n);
+function J(e, t, n) {
+	return Y(e, t, n);
 }
-function q(e, i, a) {
+function Y(e, i, a) {
 	let m = `svg|${i}|${$(a)}`;
 	if (!y(e, m)) return !1;
 	b(e) && e.clear(), Q(e);
-	let g = new DOMParser().parseFromString(i, "image/svg+xml"), _ = g.documentElement, v = p(u(_)), S = Ee(Te(_.getAttribute("viewBox")), a), C = g.querySelectorAll("path,rect,circle,ellipse,line,polyline,polygon");
+	let g = new DOMParser().parseFromString(i, "image/svg+xml"), _ = g.documentElement, v = p(u(_)), S = De(Ee(_.getAttribute("viewBox")), a), C = g.querySelectorAll("path,rect,circle,ellipse,line,polyline,polygon");
 	for (let i of C) {
 		if (l(i)) continue;
 		let p = u(i), m = r(p.transform), g = {
@@ -544,47 +544,51 @@ function q(e, i, a) {
 	}
 	return x(e, m), !0;
 }
-function J(e, t, n) {
-	ve(e, t, n);
-}
-function Y(e, t, n) {
-	return ve(e, t, n);
+function _e(e, t, n) {
+	ye(e, t, n);
 }
 function ve(e, t, n) {
-	let r = `compiled|${De(t)}|${$(n)}`;
+	return ye(e, t, n);
+}
+function ye(e, t, n) {
+	let r = `compiled|${Oe(t)}|${$(n)}`;
 	if (!y(e, r)) return !1;
 	b(e) && e.clear(), Q(e);
-	let i = Ee(t.viewBox, n), a = n?.overrideFill, o = n?.overrideStroke, c = a !== void 0 || o !== void 0, l = t.items;
+	let i = De(t.viewBox, n), a = n?.overrideFill, o = n?.overrideStroke, c = a !== void 0 || o !== void 0, l = t.items;
 	if (Array.isArray(l) && l.length > 0) {
-		let u = i ? xe(t, i) : l;
+		let u = i ? Se(t, i) : l;
 		for (let t of u) {
-			let r = c ? be(t.style, a, o) : t.style;
+			let r = c ? xe(t.style, a, o) : t.style;
 			t.kind === "native" ? s(e, t.shape, r) : M(e, t.commands, r, n);
 		}
 		return x(e, r), !0;
 	}
-	let u = i ? Se(t, i) : t.paths;
+	let u = i ? Ce(t, i) : t.paths;
 	for (let t of u) {
-		let r = c ? be(t.style, a, o) : t.style;
+		let r = c ? xe(t.style, a, o) : t.style;
 		M(e, t.commands, r, n);
 	}
 	return x(e, r), !0;
 }
-function ye(e) {
+function X(e) {
 	S(e);
 }
-function X(e) {
+function be(e) {
 	C(e);
 }
-function be(e, t, n) {
+function xe(e, t, n) {
 	if (t === void 0 && n === void 0) return e;
-	let r = { ...e };
-	return t !== void 0 && (r.fill = t), n !== void 0 && (r.stroke = n), r;
+	let r = V.get(e);
+	r || (r = /* @__PURE__ */ new Map(), V.set(e, r));
+	let i = `${t ?? "_"}|${n ?? "_"}`, a = r.get(i);
+	if (a) return a;
+	let o = { ...e };
+	return t !== void 0 && (o.fill = t), n !== void 0 && (o.stroke = n), r.set(i, o), o;
 }
-function xe(e, t) {
+function Se(e, t) {
 	let r = z.get(e);
 	r || (r = /* @__PURE__ */ new Map(), z.set(e, r));
-	let i = Ce(t), a = r.get(i);
+	let i = we(t), a = r.get(i);
 	if (a) return a;
 	let o = e.items.map((e) => e.kind === "native" ? {
 		kind: "native",
@@ -597,10 +601,10 @@ function xe(e, t) {
 	});
 	return r.set(i, o), o;
 }
-function Se(e, t) {
+function Ce(e, t) {
 	let n = B.get(e);
 	n || (n = /* @__PURE__ */ new Map(), B.set(e, n));
-	let r = Ce(t), i = n.get(r);
+	let r = we(t), i = n.get(r);
 	if (i) return i;
 	let a = e.paths.map((e) => ({
 		commands: R(e.commands, t.scale, t.tx, t.ty),
@@ -614,14 +618,14 @@ function Z(e, t) {
 		strokeWidth: e.strokeWidth * t
 	};
 }
-function Ce(e) {
+function we(e) {
 	return `${e.scale}|${e.tx}|${e.ty}`;
 }
 function Q(e) {
 	let t = e.scene?.sys?.game?.renderer;
 	w(t?.config);
 }
-function we(e) {
+function Te(e) {
 	return {
 		fill: e?.fill ?? 0,
 		fillAlpha: e?.fillAlpha ?? 1,
@@ -634,7 +638,7 @@ function we(e) {
 		opacity: e?.opacity ?? 1
 	};
 }
-function Te(e) {
+function Ee(e) {
 	if (!e) return;
 	let t = e.trim().split(/[\s,]+/);
 	if (t.length !== 4) return;
@@ -646,14 +650,14 @@ function Te(e) {
 		height: a
 	};
 }
-function Ee(e, t) {
+function De(e, t) {
 	if (e && !(t?.width === void 0 && t?.height === void 0)) return ge(e, t.width ?? t.height ?? e.width, t.height ?? t.width ?? e.height);
 }
-function De(e) {
-	let t = V.get(e);
+function Oe(e) {
+	let t = H.get(e);
 	if (t !== void 0) return t;
-	let n = H;
-	return H += 1, V.set(e, n), n;
+	let n = U;
+	return U += 1, H.set(e, n), n;
 }
 function $(e) {
 	return [
@@ -664,10 +668,10 @@ function $(e) {
 		e?.height
 	].join("|");
 }
-function Oe(e) {
+function ke(e) {
 	return String(e?.curveResolution);
 }
-function ke(e) {
+function Ae(e) {
 	return e ? [
 		e.fill,
 		e.fillAlpha,
@@ -682,7 +686,7 @@ function ke(e) {
 }
 //#endregion
 //#region src/plugin.ts
-var Ae = class extends g.Plugins.ScenePlugin {
+var je = class extends g.Plugins.ScenePlugin {
 	defaultOptions = {};
 	boot() {
 		i(this.systems, "Scene systems not available").events.once("destroy", this.destroy, this);
@@ -691,50 +695,50 @@ var Ae = class extends g.Plugins.ScenePlugin {
 		return this.defaultOptions = { ...e }, this;
 	}
 	draw(e, t, n) {
-		G(e, t, {
+		q(e, t, {
 			...this.defaultOptions,
 			...n
 		});
 	}
 	drawIfDirty(e, t, n) {
-		return K(e, t, {
+		return J(e, t, {
 			...this.defaultOptions,
 			...n
 		});
 	}
 	drawPath(e, t, n, r) {
-		U(e, t, n, {
+		W(e, t, n, {
 			...this.defaultOptions,
 			...r
 		});
 	}
 	drawPathIfDirty(e, t, n, r) {
-		return _e(e, t, n, {
+		return G(e, t, n, {
 			...this.defaultOptions,
 			...r
 		});
 	}
 	drawCompiled(e, t, n) {
-		J(e, t, {
+		_e(e, t, {
 			...this.defaultOptions,
 			...n
 		});
 	}
 	drawCompiledIfDirty(e, t, n) {
-		return Y(e, t, {
+		return ve(e, t, {
 			...this.defaultOptions,
 			...n
 		});
 	}
 	markDirty(e) {
-		return ye(e), this;
+		return X(e), this;
 	}
 	clearDirtyState(e) {
-		return X(e), this;
+		return be(e), this;
 	}
 	destroy() {
 		super.destroy();
 	}
 };
 //#endregion
-export { e as DEFAULT_STYLE, Ae as SVGPlugin, X as clearSVGDirtyState, m as compileSVG, f as convertShape, J as drawCompiledSVG, Y as drawCompiledSVGIfDirty, G as drawSVG, K as drawSVGIfDirty, U as drawSVGPath, _e as drawSVGPathIfDirty, ye as markSVGDirty, a as parseColor, t as parsePath, M as renderPath, o as resolveStyle };
+export { e as DEFAULT_STYLE, je as SVGPlugin, be as clearSVGDirtyState, m as compileSVG, f as convertShape, _e as drawCompiledSVG, ve as drawCompiledSVGIfDirty, q as drawSVG, J as drawSVGIfDirty, W as drawSVGPath, G as drawSVGPathIfDirty, X as markSVGDirty, a as parseColor, t as parsePath, M as renderPath, o as resolveStyle };
