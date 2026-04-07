@@ -72,6 +72,14 @@ export function renderPath(
     style.fill !== null ? style.fillAlpha * style.opacity : 0
   const effectiveStrokeAlpha =
     style.stroke !== null ? style.strokeAlpha * style.opacity : 0
+  const canFill = style.fill !== null && effectiveFillAlpha > 0
+  const canStroke =
+    style.stroke !== null && style.strokeWidth > 0 && effectiveStrokeAlpha > 0
+
+  // Fully invisible paths do not need tessellation, stroke, or join work.
+  if (!canFill && !canStroke) {
+    return
+  }
 
   if (isSimplePath(commands)) {
     renderSimplePath(
@@ -80,6 +88,8 @@ export function renderPath(
       style,
       effectiveFillAlpha,
       effectiveStrokeAlpha,
+      canFill,
+      canStroke,
     )
   } else {
     renderComplexPath(
@@ -88,6 +98,8 @@ export function renderPath(
       style,
       effectiveFillAlpha,
       effectiveStrokeAlpha,
+      canFill,
+      canStroke,
       options,
     )
   }
@@ -103,6 +115,8 @@ function renderSimplePath(
   style: SVGStyle,
   fillAlpha: number,
   strokeAlpha: number,
+  canFill: boolean,
+  canStroke: boolean,
 ): void {
   const tessellated = getSimpleSubpaths(commands)
 
@@ -110,13 +124,14 @@ function renderSimplePath(
 
   // Fill using bridged polygons so compound paths with holes
   // render correctly under WebGL.
-  if (style.fill !== null && tessellated.some((s) => s.closed)) {
+  if (canFill && tessellated.some((s) => s.closed)) {
     fillCompoundPath(graphics, tessellated, style, fillAlpha)
   }
 
   // Stroke each subpath
-  if (style.stroke !== null) {
-    graphics.lineStyle(style.strokeWidth, style.stroke, strokeAlpha)
+  if (canStroke) {
+    const strokeColor = assertDefined(style.stroke)
+    graphics.lineStyle(style.strokeWidth, strokeColor, strokeAlpha)
 
     for (const { points, closed } of tessellated) {
       graphics.beginPath()
@@ -134,8 +149,10 @@ function renderSimplePath(
   }
 
   // Line joins / caps
-  for (const { points, closed } of tessellated) {
-    drawLineJoins(graphics, points, closed, style, strokeAlpha)
+  if (canStroke) {
+    for (const { points, closed } of tessellated) {
+      drawLineJoins(graphics, points, closed, style, strokeAlpha)
+    }
   }
 }
 
@@ -149,6 +166,8 @@ function renderComplexPath(
   style: SVGStyle,
   fillAlpha: number,
   strokeAlpha: number,
+  canFill: boolean,
+  canStroke: boolean,
   options?: RenderOptions | undefined,
 ): void {
   const resolution = resolveCurveResolution(options)
@@ -158,13 +177,14 @@ function renderComplexPath(
 
   // Fill using bridged polygons so compound paths with holes render
   // correctly (Phaser's WebGL pipeline doesn't honour winding rules).
-  if (style.fill !== null && tessellated.some((s) => s.closed)) {
+  if (canFill && tessellated.some((s) => s.closed)) {
     fillCompoundPath(graphics, tessellated, style, fillAlpha)
   }
 
   // Stroke: draw each subpath outline individually
-  if (style.stroke !== null) {
-    graphics.lineStyle(style.strokeWidth, style.stroke, strokeAlpha)
+  if (canStroke) {
+    const strokeColor = assertDefined(style.stroke)
+    graphics.lineStyle(style.strokeWidth, strokeColor, strokeAlpha)
 
     for (const { points, closed } of tessellated) {
       graphics.beginPath()
@@ -182,8 +202,10 @@ function renderComplexPath(
   }
 
   // Line joins / caps per subpath
-  for (const { points, closed } of tessellated) {
-    drawLineJoins(graphics, points, closed, style, strokeAlpha)
+  if (canStroke) {
+    for (const { points, closed } of tessellated) {
+      drawLineJoins(graphics, points, closed, style, strokeAlpha)
+    }
   }
 }
 
