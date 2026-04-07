@@ -1,0 +1,1 @@
+Object.defineProperty(exports,Symbol.toStringTag,{value:`Module`});const e=require(`./compiler-V76gnDhE.cjs`);require(`./phaser-svg.cjs`);let t=require(`node:fs/promises`);function n(){return{name:`phaser-svg`,enforce:`pre`,async load(n){if(!n.endsWith(`.svg`))return null;let r=e.t(await(0,t.readFile)(n,`utf-8`));return`export default ${JSON.stringify(r)};`}}}exports.phaserSVG=n;

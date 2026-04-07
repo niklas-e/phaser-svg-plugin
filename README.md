@@ -40,7 +40,7 @@ Release preparation docs:
 ## Install
 
 ```bash
-npm install phaser-svg phaser
+npm install phaser git+https://github.com/niklas-e/phaser-svg-plugin.git#main
 ```
 
 ## Benchmarking crispness and performance
