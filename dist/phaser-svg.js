@@ -1,4 +1,4 @@
-import { a as e, c as t, d as n, f as r, g as i, h as a, i as o, l as s, m as c, n as l, o as u, p as d, r as f, s as p, t as m, u as h } from "./compiler-W9Zoqo_A.js";
+import { a as e, c as t, d as n, f as r, g as i, h as a, i as o, l as s, m as c, n as l, o as u, p as d, r as f, s as p, t as m, u as h } from "./compiler-CXAcl6q7.js";
 import g from "phaser";
 //#region src/dirty-state.ts
 var _ = /* @__PURE__ */ new WeakMap(), v = /* @__PURE__ */ new WeakSet();
@@ -110,15 +110,16 @@ function te(e) {
 	return k.set(e, n), n;
 }
 function N(e, t, n, r) {
-	let i = n.fill === null ? 0 : n.fillAlpha * n.opacity, a = n.stroke === null ? 0 : n.strokeAlpha * n.opacity;
-	te(t) ? ne(e, t, n, i, a) : re(e, t, n, i, a, r);
+	let i = n.fill === null ? 0 : n.fillAlpha * n.opacity, a = n.stroke === null ? 0 : n.strokeAlpha * n.opacity, o = n.fill !== null && i > 0, s = n.stroke !== null && n.strokeWidth > 0 && a > 0;
+	!o && !s || (te(t) ? ne(e, t, n, i, a, o, s) : re(e, t, n, i, a, o, s, r));
 }
-function ne(e, t, n, r, a) {
-	let o = ie(t);
-	if (o.length !== 0) {
-		if (n.fill !== null && o.some((e) => e.closed) && P(e, o, n, r), n.stroke !== null) {
-			e.lineStyle(n.strokeWidth, n.stroke, a);
-			for (let { points: t, closed: n } of o) {
+function ne(e, t, n, r, a, o, s) {
+	let c = ie(t);
+	if (c.length !== 0) {
+		if (o && c.some((e) => e.closed) && P(e, c, n, r), s) {
+			let t = i(n.stroke);
+			e.lineStyle(n.strokeWidth, t, a);
+			for (let { points: t, closed: n } of c) {
 				e.beginPath();
 				let r = i(t[0]);
 				e.moveTo(r.x, r.y);
@@ -129,15 +130,16 @@ function ne(e, t, n, r, a) {
 				n && e.closePath(), e.strokePath();
 			}
 		}
-		for (let { points: t, closed: r } of o) R(e, t, r, n, a);
+		if (s) for (let { points: t, closed: r } of c) R(e, t, r, n, a);
 	}
 }
-function re(e, t, n, r, a, o) {
-	let s = ae(t, ee(o));
-	if (s.length !== 0) {
-		if (n.fill !== null && s.some((e) => e.closed) && P(e, s, n, r), n.stroke !== null) {
-			e.lineStyle(n.strokeWidth, n.stroke, a);
-			for (let { points: t, closed: n } of s) {
+function re(e, t, n, r, a, o, s, c) {
+	let l = ae(t, ee(c));
+	if (l.length !== 0) {
+		if (o && l.some((e) => e.closed) && P(e, l, n, r), s) {
+			let t = i(n.stroke);
+			e.lineStyle(n.strokeWidth, t, a);
+			for (let { points: t, closed: n } of l) {
 				e.beginPath();
 				let r = i(t[0]);
 				e.moveTo(r.x, r.y);
@@ -148,7 +150,7 @@ function re(e, t, n, r, a, o) {
 				n && e.closePath(), e.strokePath();
 			}
 		}
-		for (let { points: t, closed: r } of s) R(e, t, r, n, a);
+		if (s) for (let { points: t, closed: r } of l) R(e, t, r, n, a);
 	}
 }
 function ie(e) {

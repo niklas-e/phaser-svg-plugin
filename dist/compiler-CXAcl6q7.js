@@ -280,11 +280,12 @@ function d(e) {
 }
 //#endregion
 //#region src/native-shape.ts
-function f(e, t) {
+var f = 512, p = /* @__PURE__ */ new Map();
+function m(e, t) {
 	let n = e.toLowerCase();
 	if (n === "circle") {
-		let e = C(t.cx, 0), n = C(t.cy, 0), r = S(t.r);
-		return r === void 0 || r <= 0 ? void 0 : b({
+		let e = T(t.cx, 0), n = T(t.cy, 0), r = w(t.r);
+		return r === void 0 || r <= 0 ? void 0 : S({
 			kind: "circle",
 			cx: e,
 			cy: n,
@@ -292,8 +293,8 @@ function f(e, t) {
 		}, t.transform);
 	}
 	if (n === "ellipse") {
-		let e = C(t.cx, 0), n = C(t.cy, 0), r = S(t.rx), i = S(t.ry);
-		return r === void 0 || i === void 0 || r <= 0 || i <= 0 ? void 0 : b({
+		let e = T(t.cx, 0), n = T(t.cy, 0), r = w(t.rx), i = w(t.ry);
+		return r === void 0 || i === void 0 || r <= 0 || i <= 0 ? void 0 : S({
 			kind: "ellipse",
 			cx: e,
 			cy: n,
@@ -302,7 +303,7 @@ function f(e, t) {
 		}, t.transform);
 	}
 }
-function p(e, t, n, r) {
+function h(e, t, n, r) {
 	return e.kind === "circle" ? {
 		kind: "circle",
 		cx: e.cx * t + n,
@@ -316,16 +317,16 @@ function p(e, t, n, r) {
 		ry: e.ry * t
 	};
 }
-function m(e, t, n) {
-	let { cx: r, cy: i, rx: a, ry: o } = h(t), s = n.fill === null ? 0 : n.fillAlpha * n.opacity, c = n.stroke === null ? 0 : n.strokeAlpha * n.opacity;
+function g(e, t, n) {
+	let { cx: r, cy: i, rx: a, ry: o } = _(t), s = n.fill === null ? 0 : n.fillAlpha * n.opacity, c = n.stroke === null ? 0 : n.strokeAlpha * n.opacity;
 	if (n.fill !== null && s > 0) {
 		e.fillStyle(n.fill, s);
-		let t = v(a, o);
+		let t = b(a, o);
 		e.fillEllipse(r, i, a * 2, o * 2, t);
 	}
-	n.stroke !== null && n.strokeWidth > 0 && c > 0 && g(e, t, n.stroke, c, n.strokeWidth);
+	n.stroke !== null && n.strokeWidth > 0 && c > 0 && v(e, t, n.stroke, c, n.strokeWidth);
 }
-function h(e) {
+function _(e) {
 	return e.kind === "circle" ? {
 		cx: e.cx,
 		cy: e.cy,
@@ -338,39 +339,45 @@ function h(e) {
 		ry: e.ry
 	};
 }
-function g(e, t, n, r, i) {
-	let { cx: a, cy: o, rx: s, ry: c } = h(t), l = i / 2, u = s + l, d = c + l, f = s - l, p = c - l;
+function v(e, t, n, r, i) {
+	let { cx: a, cy: o, rx: s, ry: c } = _(t), l = i / 2, u = s + l, d = c + l, f = s - l, p = c - l;
 	if (e.fillStyle(n, r), f <= 0 || p <= 0) {
-		let t = v(u, d);
+		let t = b(u, d);
 		e.fillEllipse(a, o, u * 2, d * 2, t);
 		return;
 	}
-	let m = v(u, d), g = _(a, o, u, d, m), y = _(a, o, f, p, m);
+	let m = b(u, d), h = y(u, d, m), g = y(f, p, m);
 	for (let t = 0; t < m; t++) {
-		let n = (t + 1) % m, r = g[t], i = g[n], a = y[t], o = y[n];
-		!r || !i || !a || !o || (e.fillTriangle(r.x, r.y, i.x, i.y, o.x, o.y), e.fillTriangle(r.x, r.y, o.x, o.y, a.x, a.y));
+		let n = (t + 1) % m, r = h[t], i = h[n], s = g[t], c = g[n];
+		!r || !i || !s || !c || (e.fillTriangle(r.x + a, r.y + o, i.x + a, i.y + o, c.x + a, c.y + o), e.fillTriangle(r.x + a, r.y + o, c.x + a, c.y + o, s.x + a, s.y + o));
 	}
-}
-function _(e, t, n, r, i) {
-	let a = [], o = Math.PI * 2 / i;
-	for (let s = 0; s < i; s++) {
-		let i = s * o;
-		a.push({
-			x: e + n * Math.cos(i),
-			y: t + r * Math.sin(i)
-		});
-	}
-	return a;
-}
-function v(e, t) {
-	let n = Math.PI * (3 * (e + t) - Math.sqrt((3 * e + t) * (e + 3 * t)));
-	return y(Math.ceil(n / 2), 24, 256);
 }
 function y(e, t, n) {
-	return Math.max(t, Math.min(n, e));
+	let r = `${n}|${e}|${t}`, i = p.get(r);
+	if (i) return i;
+	let a = [], o = Math.PI * 2 / n;
+	for (let r = 0; r < n; r++) {
+		let n = r * o;
+		a.push({
+			x: e * Math.cos(n),
+			y: t * Math.sin(n)
+		});
+	}
+	if (p.size >= f) {
+		let e = p.keys().next().value;
+		e !== void 0 && p.delete(e);
+	}
+	return p.set(r, a), a;
 }
 function b(e, t) {
-	let n = x(t);
+	let n = Math.PI * (3 * (e + t) - Math.sqrt((3 * e + t) * (e + 3 * t)));
+	return x(Math.ceil(n / 2), 24, 256);
+}
+function x(e, t, n) {
+	return Math.max(t, Math.min(n, e));
+}
+function S(e, t) {
+	let n = C(t);
 	if (!n) return e;
 	let r = n.a * e.cx + n.c * e.cy + n.e, i = n.b * e.cx + n.d * e.cy + n.f, a = Math.hypot(n.a, n.b), o = Math.hypot(n.c, n.d);
 	if (e.kind === "circle") {
@@ -396,7 +403,7 @@ function b(e, t) {
 		ry: e.ry * o
 	};
 }
-function x(e) {
+function C(e) {
 	if (!e) return;
 	let t = e.match(/matrix\s*\(([^)]*)\)/i);
 	if (!t?.[1]) return;
@@ -412,35 +419,35 @@ function x(e) {
 		f: c
 	};
 }
-function S(e, t) {
+function w(e, t) {
 	if (e === void 0) return t;
 	let n = Number.parseFloat(e);
 	return Number.isFinite(n) ? n : t;
 }
-function C(e, t) {
-	let n = S(e);
+function T(e, t) {
+	let n = w(e);
 	return n === void 0 ? t : n;
 }
 //#endregion
 //#region src/path-parser.ts
-function w(e) {
-	return O(D(e));
+function E(e) {
+	return A(k(e));
 }
-var T = /^[MmLlHhVvCcSsQqTtAaZz]/, E = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/;
-function D(t) {
+var D = /^[MmLlHhVvCcSsQqTtAaZz]/, O = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/;
+function k(t) {
 	let n = [], r = 0;
 	for (; r < t.length;) {
 		for (; r < t.length && (t[r] === " " || t[r] === "	" || t[r] === "\n" || t[r] === "\r" || t[r] === ",");) r++;
 		if (r >= t.length) break;
 		let i = e(t[r], `Expected character at index ${r}`);
-		if (T.test(i)) {
+		if (D.test(i)) {
 			n.push({
 				type: "command",
 				value: i
 			}), r++;
 			continue;
 		}
-		let a = t.slice(r), o = E.exec(a);
+		let a = t.slice(r), o = O.exec(a);
 		if (o) {
 			n.push({
 				type: "number",
@@ -452,7 +459,7 @@ function D(t) {
 	}
 	return n;
 }
-function O(t) {
+function A(t) {
 	let n = [], r = 0, i = 0, a = 0, o = 0, s = 0, c = 0, l = 0, u = 0, d = 0, f = "";
 	function p() {
 		let e = t[r];
@@ -584,7 +591,7 @@ function O(t) {
 }
 //#endregion
 //#region src/presentation-attrs.ts
-var k = new Set([
+var j = new Set([
 	"fill",
 	"fill-opacity",
 	"stroke",
@@ -595,17 +602,17 @@ var k = new Set([
 	"stroke-miterlimit",
 	"opacity"
 ]);
-function A(e) {
+function M(e) {
 	let t = {};
-	for (let [n, r] of Object.entries(e)) k.has(n) && (t[n] = r);
+	for (let [n, r] of Object.entries(e)) j.has(n) && (t[n] = r);
 	return t;
 }
-function j(e) {
+function N(e) {
 	let t = {};
 	for (let n of e.attributes) t[n.name] = n.value;
 	return t;
 }
-function M(e) {
+function P(e) {
 	let t = {};
 	for (let n of e.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
 		let e = n[1], r = n[2] ?? n[3];
@@ -615,7 +622,7 @@ function M(e) {
 }
 //#endregion
 //#region src/types.ts
-var N = {
+var F = {
 	fill: 0,
 	fillAlpha: 1,
 	stroke: null,
@@ -628,8 +635,8 @@ var N = {
 };
 //#endregion
 //#region src/style.ts
-function P(e) {
-	let t = { ...N }, r = e.fill;
+function I(e) {
+	let t = { ...F }, r = e.fill;
 	if (r !== void 0) {
 		let e = n(r);
 		e === null ? t.fill = null : (t.fill = e.color, t.fillAlpha = e.alpha);
@@ -659,17 +666,17 @@ function P(e) {
 }
 //#endregion
 //#region src/shape.ts
-function F(e, t) {
+function L(e, t) {
 	let n = e.toLowerCase(), r;
-	if (n === "path" ? r = t.d : n === "rect" ? r = I(t) : n === "circle" ? r = L(t) : n === "ellipse" ? r = R(t) : n === "line" ? r = z(t) : n === "polyline" ? r = B(t) : n === "polygon" && (r = V(t)), r) return {
+	if (n === "path" ? r = t.d : n === "rect" ? r = R(t) : n === "circle" ? r = z(t) : n === "ellipse" ? r = B(t) : n === "line" ? r = V(t) : n === "polyline" ? r = H(t) : n === "polygon" && (r = U(t)), r) return {
 		d: r,
-		style: P(t)
+		style: I(t)
 	};
 }
-function I(e) {
-	let t = G(e.x, 0), n = G(e.y, 0), r = W(e.width), i = W(e.height);
+function R(e) {
+	let t = q(e.x, 0), n = q(e.y, 0), r = K(e.width), i = K(e.height);
 	if (r === void 0 || i === void 0 || r <= 0 || i <= 0) return;
-	let { rx: a, ry: o } = U(e, r, i), s = t + r, c = n + i;
+	let { rx: a, ry: o } = G(e, r, i), s = t + r, c = n + i;
 	return a <= 0 || o <= 0 ? `M ${t} ${n} H ${s} V ${c} H ${t} Z` : [
 		`M ${t + a} ${n}`,
 		`H ${s - a}`,
@@ -683,8 +690,8 @@ function I(e) {
 		"Z"
 	].join(" ");
 }
-function L(e) {
-	let t = G(e.cx, 0), n = G(e.cy, 0), r = W(e.r);
+function z(e) {
+	let t = q(e.cx, 0), n = q(e.cy, 0), r = K(e.r);
 	if (r === void 0 || r <= 0) return;
 	let i = t - r, a = t + r;
 	return [
@@ -694,8 +701,8 @@ function L(e) {
 		"Z"
 	].join(" ");
 }
-function R(e) {
-	let t = G(e.cx, 0), n = G(e.cy, 0), r = W(e.rx), i = W(e.ry);
+function B(e) {
+	let t = q(e.cx, 0), n = q(e.cy, 0), r = K(e.rx), i = K(e.ry);
 	if (r === void 0 || i === void 0 || r <= 0 || i <= 0) return;
 	let a = t - r, o = t + r;
 	return [
@@ -705,20 +712,20 @@ function R(e) {
 		"Z"
 	].join(" ");
 }
-function z(e) {
-	return `M ${G(e.x1, 0)} ${G(e.y1, 0)} L ${G(e.x2, 0)} ${G(e.y2, 0)}`;
+function V(e) {
+	return `M ${q(e.x1, 0)} ${q(e.y1, 0)} L ${q(e.x2, 0)} ${q(e.y2, 0)}`;
 }
-function B(e) {
-	let t = H(e.points);
+function H(e) {
+	let t = W(e.points);
 	if (!t || t.length < 2) return;
 	let n = t[0];
 	if (n) return [`M ${n.x} ${n.y}`, ...t.slice(1).map((e) => `L ${e.x} ${e.y}`)].join(" ");
 }
-function V(e) {
-	let t = B(e);
+function U(e) {
+	let t = H(e);
 	if (t) return `${t} Z`;
 }
-function H(e) {
+function W(e) {
 	if (!e) return;
 	let t = Array.from(e.matchAll(/[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g), (e) => Number.parseFloat(e[0])).filter((e) => Number.isFinite(e));
 	if (t.length < 4) return;
@@ -732,8 +739,8 @@ function H(e) {
 	}
 	return n.length > 0 ? n : void 0;
 }
-function U(e, t, n) {
-	let r = W(e.rx), i = W(e.ry);
+function G(e, t, n) {
+	let r = K(e.rx), i = K(e.ry);
 	if (r === void 0 && i === void 0) return {
 		rx: 0,
 		ry: 0
@@ -744,18 +751,18 @@ function U(e, t, n) {
 		ry: Math.min(Math.max(o ?? 0, 0), n / 2)
 	};
 }
-function W(e, t) {
+function K(e, t) {
 	if (e === void 0) return t;
 	let n = Number.parseFloat(e);
 	return Number.isFinite(n) ? n : t;
 }
-function G(e, t) {
-	let n = W(e);
+function q(e, t) {
+	let n = K(e);
 	return n === void 0 ? t : n;
 }
 //#endregion
 //#region src/svg-structure.ts
-var K = [
+var J = [
 	"defs",
 	"clipPath",
 	"mask",
@@ -764,13 +771,13 @@ var K = [
 	"marker",
 	"linearGradient",
 	"radialGradient"
-], q = K.join(",");
-function J(e) {
-	return e.closest(q) !== null;
+], Y = J.join(",");
+function X(e) {
+	return e.closest(Y) !== null;
 }
-function Y(e) {
+function Z(e) {
 	let t = e;
-	for (let e of K) {
+	for (let e of J) {
 		let n = RegExp(`<${e}\\b[\\s\\S]*?<\\/${e}>`, "gi"), r = "";
 		for (; r !== t;) r = t, t = t.replace(n, "");
 	}
@@ -778,26 +785,26 @@ function Y(e) {
 }
 //#endregion
 //#region src/compiler.ts
-function X(e) {
-	let t = $(e) ?? null, n = Q(e), r = Z(Y(e)), s = [], c = [];
+function Q(e) {
+	let t = te(e) ?? null, n = ee(e), r = $(Z(e)), s = [], c = [];
 	for (let { tagName: e, attrs: t } of r) {
 		let r = {
 			...n,
 			...t
-		}, l = i(t.transform), u = f(e, t), d = F(e, r);
+		}, l = i(t.transform), u = m(e, t), d = L(e, r);
 		if (!d) continue;
-		let { d: p, style: m } = d, h = w(p);
-		l && (h = a(h, l), m.strokeWidth *= o(l)), s.push({
+		let { d: f, style: p } = d, h = E(f);
+		l && (h = a(h, l), p.strokeWidth *= o(l)), s.push({
 			commands: h,
-			style: m
+			style: p
 		}), u && !l ? c.push({
 			kind: "native",
 			shape: u,
-			style: m
+			style: p
 		}) : c.push({
 			kind: "path",
 			commands: h,
-			style: m
+			style: p
 		});
 	}
 	return {
@@ -806,12 +813,12 @@ function X(e) {
 		paths: s
 	};
 }
-function Z(e) {
+function $(e) {
 	let t = [];
 	for (let n of e.matchAll(/<(path|rect|circle|ellipse|line|polyline|polygon)\s+([^>]*?)\s*\/?>/gi)) {
 		let e = n[1], r = n[2];
 		if (!e || !r) continue;
-		let i = M(r);
+		let i = P(r);
 		t.push({
 			tagName: e,
 			attrs: i
@@ -819,11 +826,11 @@ function Z(e) {
 	}
 	return t;
 }
-function Q(e) {
+function ee(e) {
 	let t = e.match(/<svg\s+([^>]*?)>/i);
-	return t?.[1] ? A(M(t[1])) : {};
+	return t?.[1] ? M(P(t[1])) : {};
 }
-function $(e) {
+function te(e) {
 	let t = e.match(/<svg\s[^>]*viewBox\s*=\s*["']([^"']*)["']/i);
 	if (!t?.[1]) return;
 	let n = t[1].trim().split(/[\s,]+/);
@@ -837,4 +844,4 @@ function $(e) {
 	};
 }
 //#endregion
-export { N as a, w as c, p as d, i as f, e as g, n as h, P as i, m as l, a as m, J as n, j as o, o as p, F as r, A as s, X as t, f as u };
+export { F as a, E as c, h as d, i as f, e as g, n as h, I as i, g as l, a as m, X as n, N as o, o as p, L as r, M as s, Q as t, m as u };

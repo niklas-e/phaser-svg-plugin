@@ -1,4 +1,4 @@
-import { t as e } from "./compiler-W9Zoqo_A.js";
+import { t as e } from "./compiler-CXAcl6q7.js";
 import { readFile as t } from "node:fs/promises";
 //#region src/vite-plugin.ts
 function n() {
