@@ -33,6 +33,20 @@ const TESSELLATED_SUBPATH_CACHE = new WeakMap<
   PathCommand[],
   Map<number, ReadonlyArray<TessellatedSubpath>>
 >()
+type CompoundFillGroup = {
+  ring: ReadonlyArray<{ x: number; y: number }>
+  bridges?: ReadonlyArray<{
+    a: { x: number; y: number }
+    b: { x: number; y: number }
+  }>
+}
+const COMPOUND_FILL_CACHE = new WeakMap<
+  ReadonlyArray<{
+    points: ReadonlyArray<{ x: number; y: number }>
+    closed: boolean
+  }>,
+  ReadonlyArray<CompoundFillGroup>
+>()
 type JoinDecorationOp =
   | { kind: "circle"; x: number; y: number; radius: number }
   | { kind: "polygon"; points: ReadonlyArray<Point2D> }
@@ -443,51 +457,72 @@ function fillCompoundPath(
   style: SVGStyle,
   fillAlpha: number,
 ): void {
-  const closed = subpaths.filter((s) => s.closed)
-  if (closed.length === 0) return
-
-  const groups = groupSubpathsForFill(closed)
+  const groups = getCompoundFillGroups(subpaths)
+  if (groups.length === 0) return
 
   graphics.fillStyle(assertDefined(style.fill), fillAlpha)
 
   for (const group of groups) {
-    if (group.holes.length === 0) {
-      graphics.beginPath()
-      const start = assertDefined(group.outer[0])
-      graphics.moveTo(start.x, start.y)
-      for (let j = 1; j < group.outer.length; j++) {
-        const pt = assertDefined(group.outer[j])
-        graphics.lineTo(pt.x, pt.y)
-      }
-      graphics.closePath()
-      graphics.fillPath()
-      continue
-    }
-
-    const result = buildBridgedPolygon(group.outer, group.holes)
-
     graphics.beginPath()
-    const start = assertDefined(result.ring[0])
+    const start = assertDefined(group.ring[0])
     graphics.moveTo(start.x, start.y)
-    for (let j = 1; j < result.ring.length; j++) {
-      const pt = assertDefined(result.ring[j])
+    for (let j = 1; j < group.ring.length; j++) {
+      const pt = assertDefined(group.ring[j])
       graphics.lineTo(pt.x, pt.y)
     }
     graphics.closePath()
     graphics.fillPath()
+
+    if (!group.bridges || group.bridges.length === 0) {
+      continue
+    }
 
     // Patch hairline cracks along bridge slits by stroking a 1px line
     // over each bridge edge. Unlike filled quads, strokes render with
     // consistent sub-pixel coverage at every zoom level.
     const fillColor = assertDefined(style.fill)
     graphics.lineStyle(1, fillColor, fillAlpha)
-    for (const bridge of result.bridges) {
+    for (const bridge of group.bridges) {
       graphics.beginPath()
       graphics.moveTo(bridge.a.x, bridge.a.y)
       graphics.lineTo(bridge.b.x, bridge.b.y)
       graphics.strokePath()
     }
   }
+}
+
+function getCompoundFillGroups(
+  subpaths: ReadonlyArray<{
+    points: ReadonlyArray<{ x: number; y: number }>
+    closed: boolean
+  }>,
+): ReadonlyArray<CompoundFillGroup> {
+  const cached = COMPOUND_FILL_CACHE.get(subpaths)
+  if (cached) {
+    return cached
+  }
+
+  const closed = subpaths.filter((s) => s.closed)
+  if (closed.length === 0) {
+    COMPOUND_FILL_CACHE.set(subpaths, [])
+    return []
+  }
+
+  const grouped = groupSubpathsForFill(closed)
+  const prepared: CompoundFillGroup[] = grouped.map((group) => {
+    if (group.holes.length === 0) {
+      return { ring: group.outer }
+    }
+
+    const bridged = buildBridgedPolygon(group.outer, group.holes)
+    return {
+      ring: bridged.ring,
+      bridges: bridged.bridges,
+    }
+  })
+
+  COMPOUND_FILL_CACHE.set(subpaths, prepared)
+  return prepared
 }
 
 interface BridgeEdge {
