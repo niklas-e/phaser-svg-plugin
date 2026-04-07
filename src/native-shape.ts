@@ -5,6 +5,11 @@ export type NativeShape =
   | { kind: "circle"; cx: number; cy: number; r: number }
   | { kind: "ellipse"; cx: number; cy: number; rx: number; ry: number }
 
+type EllipsePoint = { x: number; y: number }
+
+const ELLIPSE_SAMPLE_CACHE_MAX_ENTRIES = 512
+const ELLIPSE_SAMPLE_CACHE = new Map<string, ReadonlyArray<EllipsePoint>>()
+
 export function parseNativeShape(
   tagName: string,
   attrs: Record<string, string>,
@@ -139,8 +144,8 @@ function drawNativeStrokeRing(
   }
 
   const segments = computeEllipseSegments(outerRx, outerRy)
-  const outer = sampleEllipse(cx, cy, outerRx, outerRy, segments)
-  const inner = sampleEllipse(cx, cy, innerRx, innerRy, segments)
+  const outer = getSampledEllipse(outerRx, outerRy, segments)
+  const inner = getSampledEllipse(innerRx, innerRy, segments)
 
   for (let i = 0; i < segments; i++) {
     const next = (i + 1) % segments
@@ -150,28 +155,55 @@ function drawNativeStrokeRing(
     const i1 = inner[next]
     if (!o0 || !o1 || !i0 || !i1) continue
 
-    graphics.fillTriangle(o0.x, o0.y, o1.x, o1.y, i1.x, i1.y)
-    graphics.fillTriangle(o0.x, o0.y, i1.x, i1.y, i0.x, i0.y)
+    graphics.fillTriangle(
+      o0.x + cx,
+      o0.y + cy,
+      o1.x + cx,
+      o1.y + cy,
+      i1.x + cx,
+      i1.y + cy,
+    )
+    graphics.fillTriangle(
+      o0.x + cx,
+      o0.y + cy,
+      i1.x + cx,
+      i1.y + cy,
+      i0.x + cx,
+      i0.y + cy,
+    )
   }
 }
 
-function sampleEllipse(
-  cx: number,
-  cy: number,
+function getSampledEllipse(
   rx: number,
   ry: number,
   segments: number,
-): Array<{ x: number; y: number }> {
-  const points: Array<{ x: number; y: number }> = []
+): ReadonlyArray<EllipsePoint> {
+  const key = `${segments}|${rx}|${ry}`
+  const cached = ELLIPSE_SAMPLE_CACHE.get(key)
+  if (cached) {
+    return cached
+  }
+
+  const points: EllipsePoint[] = []
   const step = (Math.PI * 2) / segments
 
   for (let i = 0; i < segments; i++) {
     const theta = i * step
     points.push({
-      x: cx + rx * Math.cos(theta),
-      y: cy + ry * Math.sin(theta),
+      x: rx * Math.cos(theta),
+      y: ry * Math.sin(theta),
     })
   }
+
+  if (ELLIPSE_SAMPLE_CACHE.size >= ELLIPSE_SAMPLE_CACHE_MAX_ENTRIES) {
+    const oldestKey = ELLIPSE_SAMPLE_CACHE.keys().next().value
+    if (oldestKey !== undefined) {
+      ELLIPSE_SAMPLE_CACHE.delete(oldestKey)
+    }
+  }
+
+  ELLIPSE_SAMPLE_CACHE.set(key, points)
 
   return points
 }
