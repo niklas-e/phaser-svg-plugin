@@ -33,6 +33,13 @@ const TESSELLATED_SUBPATH_CACHE = new WeakMap<
   PathCommand[],
   Map<number, ReadonlyArray<TessellatedSubpath>>
 >()
+type JoinDecorationOp =
+  | { kind: "circle"; x: number; y: number; radius: number }
+  | { kind: "polygon"; points: ReadonlyArray<Point2D> }
+const LINE_JOIN_DECORATION_CACHE = new WeakMap<
+  ReadonlyArray<Point2D>,
+  Map<string, ReadonlyArray<JoinDecorationOp>>
+>()
 
 /**
  * Return true if the command list contains only simple commands
@@ -860,21 +867,44 @@ function drawLineJoins(
 ): void {
   if (style.stroke === null || style.strokeWidth < 2) return
 
-  const n = points.length
-  const hw = style.strokeWidth / 2
-  const needsJoins =
-    style.lineJoin === "round" ||
-    style.lineJoin === "bevel" ||
-    style.lineJoin === "miter"
-  const needsCaps =
-    !closed && (style.lineCap === "round" || style.lineCap === "square")
-  if (!needsJoins && !needsCaps) return
-  if (n < 2) return
+  const decorations = getLineJoinDecorations(points, closed, style)
+  if (decorations.length === 0) return
 
   graphics.fillStyle(style.stroke, strokeAlpha)
 
-  // Join decorations at interior vertices (all vertices for closed paths)
-  if (needsJoins && n >= 3) {
+  for (const op of decorations) {
+    if (op.kind === "circle") {
+      graphics.fillCircle(op.x, op.y, op.radius)
+      continue
+    }
+
+    fillPolygon(graphics, op.points)
+  }
+}
+
+function getLineJoinDecorations(
+  points: ReadonlyArray<Point2D>,
+  closed: boolean,
+  style: SVGStyle,
+): ReadonlyArray<JoinDecorationOp> {
+  let byStyle = LINE_JOIN_DECORATION_CACHE.get(points)
+  if (!byStyle) {
+    byStyle = new Map<string, ReadonlyArray<JoinDecorationOp>>()
+    LINE_JOIN_DECORATION_CACHE.set(points, byStyle)
+  }
+
+  const key = lineJoinDecorationKey(closed, style)
+  const cached = byStyle.get(key)
+  if (cached) {
+    return cached
+  }
+
+  const n = points.length
+  const hw = style.strokeWidth / 2
+  const ops: JoinDecorationOp[] = []
+
+  // Join decorations at interior vertices (all vertices for closed paths).
+  if (n >= 3) {
     const start = closed ? 0 : 1
     const end = closed ? n : n - 1
 
@@ -884,72 +914,80 @@ function drawLineJoins(
       const next = assertDefined(points[(i + 1) % n])
 
       if (style.lineJoin === "round") {
-        graphics.fillCircle(curr.x, curr.y, hw)
+        ops.push({ kind: "circle", x: curr.x, y: curr.y, radius: hw })
       } else if (style.lineJoin === "bevel") {
         const bevel = computeBevelJoin(prev, curr, next, hw)
         if (bevel) {
-          graphics.beginPath()
-          graphics.moveTo(curr.x, curr.y)
-          graphics.lineTo(bevel[0].x, bevel[0].y)
-          graphics.lineTo(bevel[1].x, bevel[1].y)
-          graphics.closePath()
-          graphics.fillPath()
+          ops.push({
+            kind: "polygon",
+            points: [curr, bevel[0], bevel[1]],
+          })
         }
       } else {
         const result = computeMiterJoin(prev, curr, next, hw, style.miterLimit)
         if (result) {
-          graphics.beginPath()
-          graphics.moveTo(curr.x, curr.y)
-          graphics.lineTo(result.bevel[0].x, result.bevel[0].y)
-          if (result.miter) {
-            graphics.lineTo(result.miter.x, result.miter.y)
-          }
-          graphics.lineTo(result.bevel[1].x, result.bevel[1].y)
-          graphics.closePath()
-          graphics.fillPath()
+          const pointsForOp = result.miter
+            ? [curr, result.bevel[0], result.miter, result.bevel[1]]
+            : [curr, result.bevel[0], result.bevel[1]]
+          ops.push({ kind: "polygon", points: pointsForOp })
         }
       }
     }
   }
 
-  // Caps at endpoints (open paths only)
-  if (needsCaps) {
+  // Caps at endpoints (open paths only).
+  if (!closed && n >= 2) {
     if (style.lineCap === "round") {
       const first = assertDefined(points[0])
-      graphics.fillCircle(first.x, first.y, hw)
-      if (n >= 2) {
-        const last = assertDefined(points[n - 1])
-        graphics.fillCircle(last.x, last.y, hw)
-      }
-    } else {
-      // square cap
+      const last = assertDefined(points[n - 1])
+      ops.push({ kind: "circle", x: first.x, y: first.y, radius: hw })
+      ops.push({ kind: "circle", x: last.x, y: last.y, radius: hw })
+    } else if (style.lineCap === "square") {
       const first = assertDefined(points[0])
       const second = assertDefined(points[1])
       const startCap = computeSquareCap(first, second, hw)
       if (startCap) {
-        graphics.beginPath()
-        graphics.moveTo(startCap[0].x, startCap[0].y)
-        graphics.lineTo(startCap[1].x, startCap[1].y)
-        graphics.lineTo(startCap[2].x, startCap[2].y)
-        graphics.lineTo(startCap[3].x, startCap[3].y)
-        graphics.closePath()
-        graphics.fillPath()
+        ops.push({ kind: "polygon", points: startCap })
       }
 
-      if (n >= 2) {
-        const last = assertDefined(points[n - 1])
-        const secondLast = assertDefined(points[n - 2])
-        const endCap = computeSquareCap(last, secondLast, hw)
-        if (endCap) {
-          graphics.beginPath()
-          graphics.moveTo(endCap[0].x, endCap[0].y)
-          graphics.lineTo(endCap[1].x, endCap[1].y)
-          graphics.lineTo(endCap[2].x, endCap[2].y)
-          graphics.lineTo(endCap[3].x, endCap[3].y)
-          graphics.closePath()
-          graphics.fillPath()
-        }
+      const last = assertDefined(points[n - 1])
+      const secondLast = assertDefined(points[n - 2])
+      const endCap = computeSquareCap(last, secondLast, hw)
+      if (endCap) {
+        ops.push({ kind: "polygon", points: endCap })
       }
     }
   }
+
+  byStyle.set(key, ops)
+  return ops
+}
+
+function lineJoinDecorationKey(closed: boolean, style: SVGStyle): string {
+  return [
+    closed ? 1 : 0,
+    style.strokeWidth,
+    style.lineJoin,
+    style.lineCap,
+    style.miterLimit,
+  ].join("|")
+}
+
+function fillPolygon(
+  graphics: Phaser.GameObjects.Graphics,
+  points: ReadonlyArray<Point2D>,
+): void {
+  if (points.length < 3) return
+
+  graphics.beginPath()
+  const start = assertDefined(points[0])
+  graphics.moveTo(start.x, start.y)
+
+  for (let i = 1; i < points.length; i++) {
+    const point = assertDefined(points[i])
+    graphics.lineTo(point.x, point.y)
+  }
+
+  graphics.closePath()
+  graphics.fillPath()
 }

@@ -102,21 +102,21 @@ function O(e, t, n, r) {
 }
 //#endregion
 //#region src/renderer.ts
-var k = /* @__PURE__ */ new WeakMap(), A = /* @__PURE__ */ new WeakMap(), j = /* @__PURE__ */ new WeakMap();
+var k = /* @__PURE__ */ new WeakMap(), A = /* @__PURE__ */ new WeakMap(), j = /* @__PURE__ */ new WeakMap(), M = /* @__PURE__ */ new WeakMap();
 function te(e) {
 	let t = k.get(e);
 	if (t !== void 0) return t;
 	let n = e.every((e) => e.type === "M" || e.type === "L" || e.type === "Z");
 	return k.set(e, n), n;
 }
-function M(e, t, n, r) {
+function N(e, t, n, r) {
 	let i = n.fill === null ? 0 : n.fillAlpha * n.opacity, a = n.stroke === null ? 0 : n.strokeAlpha * n.opacity;
 	te(t) ? ne(e, t, n, i, a) : re(e, t, n, i, a, r);
 }
 function ne(e, t, n, r, a) {
 	let o = ie(t);
 	if (o.length !== 0) {
-		if (n.fill !== null && o.some((e) => e.closed) && N(e, o, n, r), n.stroke !== null) {
+		if (n.fill !== null && o.some((e) => e.closed) && P(e, o, n, r), n.stroke !== null) {
 			e.lineStyle(n.strokeWidth, n.stroke, a);
 			for (let { points: t, closed: n } of o) {
 				e.beginPath();
@@ -129,13 +129,13 @@ function ne(e, t, n, r, a) {
 				n && e.closePath(), e.strokePath();
 			}
 		}
-		for (let { points: t, closed: r } of o) L(e, t, r, n, a);
+		for (let { points: t, closed: r } of o) R(e, t, r, n, a);
 	}
 }
 function re(e, t, n, r, a, o) {
 	let s = ae(t, ee(o));
 	if (s.length !== 0) {
-		if (n.fill !== null && s.some((e) => e.closed) && N(e, s, n, r), n.stroke !== null) {
+		if (n.fill !== null && s.some((e) => e.closed) && P(e, s, n, r), n.stroke !== null) {
 			e.lineStyle(n.strokeWidth, n.stroke, a);
 			for (let { points: t, closed: n } of s) {
 				e.beginPath();
@@ -148,13 +148,13 @@ function re(e, t, n, r, a, o) {
 				n && e.closePath(), e.strokePath();
 			}
 		}
-		for (let { points: t, closed: r } of s) L(e, t, r, n, a);
+		for (let { points: t, closed: r } of s) R(e, t, r, n, a);
 	}
 }
 function ie(e) {
 	let t = A.get(e);
 	if (t) return t;
-	let n = I(e), r = [];
+	let n = L(e), r = [];
 	for (let e of n) {
 		let t = [], n = !1;
 		for (let r of e) r.type === "Z" ? n = !0 : "x" in r && "y" in r && t.push(r);
@@ -170,7 +170,7 @@ function ae(e, t) {
 	n || (n = /* @__PURE__ */ new Map(), j.set(e, n));
 	let r = n.get(t);
 	if (r) return r;
-	let a = I(e), o = [];
+	let a = L(e), o = [];
 	for (let e of a) {
 		if (e.length === 0) continue;
 		let n = i(e[0], "Subpath must start with a command");
@@ -244,7 +244,7 @@ function ce(e, t, n, r, i) {
 		});
 	}
 }
-function N(e, t, n, r) {
+function P(e, t, n, r) {
 	let a = t.filter((e) => e.closed);
 	if (a.length === 0) return;
 	let o = ue(a);
@@ -367,7 +367,7 @@ function me(e, t, n, r, i, a, o, s, c) {
 		let e = Math.sqrt(S);
 		g *= e, _ *= e, b = g * g, x = _ * _;
 	}
-	let C = Math.max(0, b * x - b * y - x * v), ee = b * y + x * v, w = Math.sqrt(C / ee), T = a === o ? -1 : 1, E = T * w * (g * h / _), D = T * w * (-(_ * m) / g), O = u * E - d * D + (e + s) / 2, k = d * E + u * D + (t + c) / 2, A = P(1, 0, (m - E) / g, (h - D) / _), j = P((m - E) / g, (h - D) / _, (-m - E) / g, (-h - D) / _);
+	let C = Math.max(0, b * x - b * y - x * v), ee = b * y + x * v, w = Math.sqrt(C / ee), T = a === o ? -1 : 1, E = T * w * (g * h / _), D = T * w * (-(_ * m) / g), O = u * E - d * D + (e + s) / 2, k = d * E + u * D + (t + c) / 2, A = F(1, 0, (m - E) / g, (h - D) / _), j = F((m - E) / g, (h - D) / _, (-m - E) / g, (-h - D) / _);
 	return !o && j > 0 && (j -= 2 * Math.PI), o && j < 0 && (j += 2 * Math.PI), {
 		cx: O,
 		cy: k,
@@ -377,65 +377,142 @@ function me(e, t, n, r, i, a, o, s, c) {
 		endAngle: A + j
 	};
 }
-function P(e, t, n, r) {
+function F(e, t, n, r) {
 	let i = e * n + t * r, a = Math.sqrt((e * e + t * t) * (n * n + r * r)), o = Math.acos(Math.max(-1, Math.min(1, i / a)));
 	return e * r - t * n < 0 && (o = -o), o;
 }
-var F = .01;
+var I = .01;
 function he(e) {
 	if (e.length < 2) return e;
 	let t = [i(e[0])];
 	for (let n = 1; n < e.length; n++) {
 		let r = i(t[t.length - 1]), a = i(e[n]), o = a.x - r.x, s = a.y - r.y;
-		o * o + s * s > F && t.push(a);
+		o * o + s * s > I && t.push(a);
 	}
 	if (t.length > 2) {
 		let e = i(t[0]), n = i(t[t.length - 1]), r = n.x - e.x, a = n.y - e.y;
-		r * r + a * a <= F && t.pop();
+		r * r + a * a <= I && t.pop();
 	}
 	return t;
 }
-function I(e) {
+function L(e) {
 	let t = [], n = [];
 	for (let r of e) r.type === "M" && n.length > 0 && (t.push(n), n = []), n.push(r);
 	return n.length > 0 && t.push(n), t;
 }
-function L(e, t, n, r, a) {
+function R(e, t, n, r, i) {
 	if (r.stroke === null || r.strokeWidth < 2) return;
-	let o = t.length, s = r.strokeWidth / 2, c = r.lineJoin === "round" || r.lineJoin === "bevel" || r.lineJoin === "miter", l = !n && (r.lineCap === "round" || r.lineCap === "square");
-	if (!(!c && !l) && !(o < 2)) {
-		if (e.fillStyle(r.stroke, a), c && o >= 3) {
-			let a = n ? 0 : 1, c = n ? o : o - 1;
-			for (let n = a; n < c; n++) {
-				let a = i(t[(n - 1 + o) % o]), c = i(t[n]), l = i(t[(n + 1) % o]);
-				if (r.lineJoin === "round") e.fillCircle(c.x, c.y, s);
-				else if (r.lineJoin === "bevel") {
-					let t = E(a, c, l, s);
-					t && (e.beginPath(), e.moveTo(c.x, c.y), e.lineTo(t[0].x, t[0].y), e.lineTo(t[1].x, t[1].y), e.closePath(), e.fillPath());
-				} else {
-					let t = D(a, c, l, s, r.miterLimit);
-					t && (e.beginPath(), e.moveTo(c.x, c.y), e.lineTo(t.bevel[0].x, t.bevel[0].y), t.miter && e.lineTo(t.miter.x, t.miter.y), e.lineTo(t.bevel[1].x, t.bevel[1].y), e.closePath(), e.fillPath());
-				}
+	let a = ge(t, n, r);
+	if (a.length !== 0) {
+		e.fillStyle(r.stroke, i);
+		for (let t of a) {
+			if (t.kind === "circle") {
+				e.fillCircle(t.x, t.y, t.radius);
+				continue;
 			}
-		}
-		if (l) if (r.lineCap === "round") {
-			let n = i(t[0]);
-			if (e.fillCircle(n.x, n.y, s), o >= 2) {
-				let n = i(t[o - 1]);
-				e.fillCircle(n.x, n.y, s);
-			}
-		} else {
-			let n = T(i(t[0]), i(t[1]), s);
-			if (n && (e.beginPath(), e.moveTo(n[0].x, n[0].y), e.lineTo(n[1].x, n[1].y), e.lineTo(n[2].x, n[2].y), e.lineTo(n[3].x, n[3].y), e.closePath(), e.fillPath()), o >= 2) {
-				let n = T(i(t[o - 1]), i(t[o - 2]), s);
-				n && (e.beginPath(), e.moveTo(n[0].x, n[0].y), e.lineTo(n[1].x, n[1].y), e.lineTo(n[2].x, n[2].y), e.lineTo(n[3].x, n[3].y), e.closePath(), e.fillPath());
-			}
+			ve(e, t.points);
 		}
 	}
 }
+function ge(e, t, n) {
+	let r = M.get(e);
+	r || (r = /* @__PURE__ */ new Map(), M.set(e, r));
+	let a = _e(t, n), o = r.get(a);
+	if (o) return o;
+	let s = e.length, c = n.strokeWidth / 2, l = [];
+	if (s >= 3) {
+		let r = t ? 0 : 1, a = t ? s : s - 1;
+		for (let t = r; t < a; t++) {
+			let r = i(e[(t - 1 + s) % s]), a = i(e[t]), o = i(e[(t + 1) % s]);
+			if (n.lineJoin === "round") l.push({
+				kind: "circle",
+				x: a.x,
+				y: a.y,
+				radius: c
+			});
+			else if (n.lineJoin === "bevel") {
+				let e = E(r, a, o, c);
+				e && l.push({
+					kind: "polygon",
+					points: [
+						a,
+						e[0],
+						e[1]
+					]
+				});
+			} else {
+				let e = D(r, a, o, c, n.miterLimit);
+				if (e) {
+					let t = e.miter ? [
+						a,
+						e.bevel[0],
+						e.miter,
+						e.bevel[1]
+					] : [
+						a,
+						e.bevel[0],
+						e.bevel[1]
+					];
+					l.push({
+						kind: "polygon",
+						points: t
+					});
+				}
+			}
+		}
+	}
+	if (!t && s >= 2) {
+		if (n.lineCap === "round") {
+			let t = i(e[0]), n = i(e[s - 1]);
+			l.push({
+				kind: "circle",
+				x: t.x,
+				y: t.y,
+				radius: c
+			}), l.push({
+				kind: "circle",
+				x: n.x,
+				y: n.y,
+				radius: c
+			});
+		} else if (n.lineCap === "square") {
+			let t = T(i(e[0]), i(e[1]), c);
+			t && l.push({
+				kind: "polygon",
+				points: t
+			});
+			let n = T(i(e[s - 1]), i(e[s - 2]), c);
+			n && l.push({
+				kind: "polygon",
+				points: n
+			});
+		}
+	}
+	return r.set(a, l), l;
+}
+function _e(e, t) {
+	return [
+		e ? 1 : 0,
+		t.strokeWidth,
+		t.lineJoin,
+		t.lineCap,
+		t.miterLimit
+	].join("|");
+}
+function ve(e, t) {
+	if (t.length < 3) return;
+	e.beginPath();
+	let n = i(t[0]);
+	e.moveTo(n.x, n.y);
+	for (let n = 1; n < t.length; n++) {
+		let r = i(t[n]);
+		e.lineTo(r.x, r.y);
+	}
+	e.closePath(), e.fillPath();
+}
 //#endregion
 //#region src/transform.ts
-function ge(e, t, n) {
+function ye(e, t, n) {
 	let r = t / e.width, i = n / e.height, a = Math.min(r, i);
 	return {
 		scale: a,
@@ -443,7 +520,7 @@ function ge(e, t, n) {
 		ty: (n - e.height * a) / 2 - e.minY * a
 	};
 }
-function R(e, t, n, r) {
+function z(e, t, n, r) {
 	let i = [];
 	for (let a of e) switch (a.type) {
 		case "M":
@@ -500,28 +577,28 @@ function R(e, t, n, r) {
 }
 //#endregion
 //#region src/draw.ts
-var z = /* @__PURE__ */ new WeakMap(), B = /* @__PURE__ */ new WeakMap(), V = /* @__PURE__ */ new WeakMap(), H = /* @__PURE__ */ new WeakMap(), U = 1;
-function W(e, t, n, r) {
-	K(e, t, n, r);
-}
+var B = /* @__PURE__ */ new WeakMap(), V = /* @__PURE__ */ new WeakMap(), H = /* @__PURE__ */ new WeakMap(), U = /* @__PURE__ */ new WeakMap(), W = 1;
 function G(e, t, n, r) {
-	return K(e, t, n, r);
+	q(e, t, n, r);
 }
-function K(e, n, r, i) {
-	let a = `path|${n}|${Ae(r)}|${ke(i)}`;
-	return y(e, a) ? (b(e) && e.clear(), Q(e), M(e, t(n), Te(r), i), x(e, a), !0) : !1;
+function K(e, t, n, r) {
+	return q(e, t, n, r);
 }
-function q(e, t, n) {
-	Y(e, t, n);
+function q(e, n, r, i) {
+	let a = `path|${n}|${Pe(r)}|${Ne(i)}`;
+	return y(e, a) ? (b(e) && e.clear(), Z(e), N(e, t(n), Ae(r), i), x(e, a), !0) : !1;
 }
 function J(e, t, n) {
-	return Y(e, t, n);
+	be(e, t, n);
 }
-function Y(e, i, a) {
+function Y(e, t, n) {
+	return be(e, t, n);
+}
+function be(e, i, a) {
 	let m = `svg|${i}|${$(a)}`;
 	if (!y(e, m)) return !1;
-	b(e) && e.clear(), Q(e);
-	let g = new DOMParser().parseFromString(i, "image/svg+xml"), _ = g.documentElement, v = p(u(_)), S = De(Ee(_.getAttribute("viewBox")), a), C = g.querySelectorAll("path,rect,circle,ellipse,line,polyline,polygon");
+	b(e) && e.clear(), Z(e);
+	let g = new DOMParser().parseFromString(i, "image/svg+xml"), _ = g.documentElement, v = p(u(_)), S = Q(je(_.getAttribute("viewBox")), a), C = g.querySelectorAll("path,rect,circle,ellipse,line,polyline,polygon");
 	for (let i of C) {
 		if (l(i)) continue;
 		let p = u(i), m = r(p.transform), g = {
@@ -540,92 +617,92 @@ function Y(e, i, a) {
 		let { d: b, style: x } = y;
 		a?.overrideFill !== void 0 && (x.fill = a.overrideFill), a?.overrideStroke !== void 0 && (x.stroke = a.overrideStroke);
 		let C = t(b);
-		m && (C = c(C, m), x.strokeWidth *= d(m)), S && (C = R(C, S.scale, S.tx, S.ty), x.strokeWidth *= S.scale), M(e, C, x, a);
+		m && (C = c(C, m), x.strokeWidth *= d(m)), S && (C = z(C, S.scale, S.tx, S.ty), x.strokeWidth *= S.scale), N(e, C, x, a);
 	}
 	return x(e, m), !0;
 }
-function _e(e, t, n) {
-	ye(e, t, n);
+function xe(e, t, n) {
+	Ce(e, t, n);
 }
-function ve(e, t, n) {
-	return ye(e, t, n);
+function Se(e, t, n) {
+	return Ce(e, t, n);
 }
-function ye(e, t, n) {
-	let r = `compiled|${Oe(t)}|${$(n)}`;
+function Ce(e, t, n) {
+	let r = `compiled|${Me(t)}|${$(n)}`;
 	if (!y(e, r)) return !1;
-	b(e) && e.clear(), Q(e);
-	let i = De(t.viewBox, n), a = n?.overrideFill, o = n?.overrideStroke, c = a !== void 0 || o !== void 0, l = t.items;
+	b(e) && e.clear(), Z(e);
+	let i = Q(t.viewBox, n), a = n?.overrideFill, o = n?.overrideStroke, c = a !== void 0 || o !== void 0, l = t.items;
 	if (Array.isArray(l) && l.length > 0) {
-		let u = i ? Se(t, i) : l;
+		let u = i ? De(t, i) : l;
 		for (let t of u) {
-			let r = c ? xe(t.style, a, o) : t.style;
-			t.kind === "native" ? s(e, t.shape, r) : M(e, t.commands, r, n);
+			let r = c ? Ee(t.style, a, o) : t.style;
+			t.kind === "native" ? s(e, t.shape, r) : N(e, t.commands, r, n);
 		}
 		return x(e, r), !0;
 	}
-	let u = i ? Ce(t, i) : t.paths;
+	let u = i ? Oe(t, i) : t.paths;
 	for (let t of u) {
-		let r = c ? xe(t.style, a, o) : t.style;
-		M(e, t.commands, r, n);
+		let r = c ? Ee(t.style, a, o) : t.style;
+		N(e, t.commands, r, n);
 	}
 	return x(e, r), !0;
 }
-function X(e) {
+function we(e) {
 	S(e);
 }
-function be(e) {
+function Te(e) {
 	C(e);
 }
-function xe(e, t, n) {
+function Ee(e, t, n) {
 	if (t === void 0 && n === void 0) return e;
-	let r = V.get(e);
-	r || (r = /* @__PURE__ */ new Map(), V.set(e, r));
+	let r = H.get(e);
+	r || (r = /* @__PURE__ */ new Map(), H.set(e, r));
 	let i = `${t ?? "_"}|${n ?? "_"}`, a = r.get(i);
 	if (a) return a;
 	let o = { ...e };
 	return t !== void 0 && (o.fill = t), n !== void 0 && (o.stroke = n), r.set(i, o), o;
 }
-function Se(e, t) {
-	let r = z.get(e);
-	r || (r = /* @__PURE__ */ new Map(), z.set(e, r));
-	let i = we(t), a = r.get(i);
+function De(e, t) {
+	let r = B.get(e);
+	r || (r = /* @__PURE__ */ new Map(), B.set(e, r));
+	let i = ke(t), a = r.get(i);
 	if (a) return a;
 	let o = e.items.map((e) => e.kind === "native" ? {
 		kind: "native",
 		shape: n(e.shape, t.scale, t.tx, t.ty),
-		style: Z(e.style, t.scale)
+		style: X(e.style, t.scale)
 	} : {
 		kind: "path",
-		commands: R(e.commands, t.scale, t.tx, t.ty),
-		style: Z(e.style, t.scale)
+		commands: z(e.commands, t.scale, t.tx, t.ty),
+		style: X(e.style, t.scale)
 	});
 	return r.set(i, o), o;
 }
-function Ce(e, t) {
-	let n = B.get(e);
-	n || (n = /* @__PURE__ */ new Map(), B.set(e, n));
-	let r = we(t), i = n.get(r);
+function Oe(e, t) {
+	let n = V.get(e);
+	n || (n = /* @__PURE__ */ new Map(), V.set(e, n));
+	let r = ke(t), i = n.get(r);
 	if (i) return i;
 	let a = e.paths.map((e) => ({
-		commands: R(e.commands, t.scale, t.tx, t.ty),
-		style: Z(e.style, t.scale)
+		commands: z(e.commands, t.scale, t.tx, t.ty),
+		style: X(e.style, t.scale)
 	}));
 	return n.set(r, a), a;
 }
-function Z(e, t) {
+function X(e, t) {
 	return t === 1 ? e : {
 		...e,
 		strokeWidth: e.strokeWidth * t
 	};
 }
-function we(e) {
+function ke(e) {
 	return `${e.scale}|${e.tx}|${e.ty}`;
 }
-function Q(e) {
+function Z(e) {
 	let t = e.scene?.sys?.game?.renderer;
 	w(t?.config);
 }
-function Te(e) {
+function Ae(e) {
 	return {
 		fill: e?.fill ?? 0,
 		fillAlpha: e?.fillAlpha ?? 1,
@@ -638,7 +715,7 @@ function Te(e) {
 		opacity: e?.opacity ?? 1
 	};
 }
-function Ee(e) {
+function je(e) {
 	if (!e) return;
 	let t = e.trim().split(/[\s,]+/);
 	if (t.length !== 4) return;
@@ -650,14 +727,14 @@ function Ee(e) {
 		height: a
 	};
 }
-function De(e, t) {
-	if (e && !(t?.width === void 0 && t?.height === void 0)) return ge(e, t.width ?? t.height ?? e.width, t.height ?? t.width ?? e.height);
+function Q(e, t) {
+	if (e && !(t?.width === void 0 && t?.height === void 0)) return ye(e, t.width ?? t.height ?? e.width, t.height ?? t.width ?? e.height);
 }
-function Oe(e) {
-	let t = H.get(e);
+function Me(e) {
+	let t = U.get(e);
 	if (t !== void 0) return t;
-	let n = U;
-	return U += 1, H.set(e, n), n;
+	let n = W;
+	return W += 1, U.set(e, n), n;
 }
 function $(e) {
 	return [
@@ -668,10 +745,10 @@ function $(e) {
 		e?.height
 	].join("|");
 }
-function ke(e) {
+function Ne(e) {
 	return String(e?.curveResolution);
 }
-function Ae(e) {
+function Pe(e) {
 	return e ? [
 		e.fill,
 		e.fillAlpha,
@@ -686,7 +763,7 @@ function Ae(e) {
 }
 //#endregion
 //#region src/plugin.ts
-var je = class extends g.Plugins.ScenePlugin {
+var Fe = class extends g.Plugins.ScenePlugin {
 	defaultOptions = {};
 	boot() {
 		i(this.systems, "Scene systems not available").events.once("destroy", this.destroy, this);
@@ -695,50 +772,50 @@ var je = class extends g.Plugins.ScenePlugin {
 		return this.defaultOptions = { ...e }, this;
 	}
 	draw(e, t, n) {
-		q(e, t, {
+		J(e, t, {
 			...this.defaultOptions,
 			...n
 		});
 	}
 	drawIfDirty(e, t, n) {
-		return J(e, t, {
+		return Y(e, t, {
 			...this.defaultOptions,
 			...n
 		});
 	}
 	drawPath(e, t, n, r) {
-		W(e, t, n, {
+		G(e, t, n, {
 			...this.defaultOptions,
 			...r
 		});
 	}
 	drawPathIfDirty(e, t, n, r) {
-		return G(e, t, n, {
+		return K(e, t, n, {
 			...this.defaultOptions,
 			...r
 		});
 	}
 	drawCompiled(e, t, n) {
-		_e(e, t, {
+		xe(e, t, {
 			...this.defaultOptions,
 			...n
 		});
 	}
 	drawCompiledIfDirty(e, t, n) {
-		return ve(e, t, {
+		return Se(e, t, {
 			...this.defaultOptions,
 			...n
 		});
 	}
 	markDirty(e) {
-		return X(e), this;
+		return we(e), this;
 	}
 	clearDirtyState(e) {
-		return be(e), this;
+		return Te(e), this;
 	}
 	destroy() {
 		super.destroy();
 	}
 };
 //#endregion
-export { e as DEFAULT_STYLE, je as SVGPlugin, be as clearSVGDirtyState, m as compileSVG, f as convertShape, _e as drawCompiledSVG, ve as drawCompiledSVGIfDirty, q as drawSVG, J as drawSVGIfDirty, W as drawSVGPath, G as drawSVGPathIfDirty, X as markSVGDirty, a as parseColor, t as parsePath, M as renderPath, o as resolveStyle };
+export { e as DEFAULT_STYLE, Fe as SVGPlugin, Te as clearSVGDirtyState, m as compileSVG, f as convertShape, xe as drawCompiledSVG, Se as drawCompiledSVGIfDirty, J as drawSVG, Y as drawSVGIfDirty, G as drawSVGPath, K as drawSVGPathIfDirty, we as markSVGDirty, a as parseColor, t as parsePath, N as renderPath, o as resolveStyle };
