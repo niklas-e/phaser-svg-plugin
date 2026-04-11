@@ -1,4 +1,4 @@
-import type Phaser from "phaser";
+import type { GameObjects } from "phaser";
 import type { PathCommand, SVGStyle } from "./types.ts";
 export interface RenderOptions {
     /** Points per curve segment for tessellation. */
@@ -7,7 +7,7 @@ export interface RenderOptions {
 /**
  * Render parsed SVG path commands onto a Phaser Graphics object.
  */
-export declare function renderPath(graphics: Phaser.GameObjects.Graphics, commands: PathCommand[], style: SVGStyle, options?: RenderOptions | undefined): void;
+export declare function renderPath(graphics: GameObjects.Graphics, commands: PathCommand[], style: SVGStyle, options?: RenderOptions | undefined): void;
 interface BridgeEdge {
     a: {
         x: number;

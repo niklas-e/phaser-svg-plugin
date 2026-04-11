@@ -1,4 +1,4 @@
-import Phaser from "phaser";
+import { type GameObjects, Plugins } from "phaser";
 import type { CompiledSVG } from "./compiler.ts";
 import { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, drawSVG, drawSVGIfDirty, drawSVGPath, drawSVGPathIfDirty, markSVGDirty, type SVGPluginOptions } from "./draw.ts";
 import type { RenderOptions } from "./renderer.ts";
@@ -9,7 +9,7 @@ export { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, drawSVG, d
  *
  * Register in your game config:
  * ```ts
- * import { SVGPlugin } from "phaser-svg";
+ * import { SVGPlugin } from "phaser-svg-plugin";
  *
  * const config = {
  *   plugins: {
@@ -26,7 +26,7 @@ export { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, drawSVG, d
  * this.svg.draw(graphics, svgString);
  * ```
  */
-export declare class SVGPlugin extends Phaser.Plugins.ScenePlugin {
+export declare class SVGPlugin extends Plugins.ScenePlugin {
     private defaultOptions;
     boot(): void;
     /** Set default options for all draw calls in this scene. */
@@ -36,17 +36,17 @@ export declare class SVGPlugin extends Phaser.Plugins.ScenePlugin {
     /** Draw an SVG string only when it changed since the last draw. */
     drawIfDirty(graphics: Phaser.GameObjects.Graphics, svgString: string, options?: SVGPluginOptions | undefined): boolean;
     /** Draw a single SVG path `d` attribute onto a Graphics object. */
-    drawPath(graphics: Phaser.GameObjects.Graphics, d: string, style?: Partial<SVGStyle> | undefined, options?: RenderOptions | undefined): void;
+    drawPath(graphics: GameObjects.Graphics, d: string, style?: Partial<SVGStyle> | undefined, options?: RenderOptions | undefined): void;
     /** Draw an SVG path only when it changed since the last draw. */
-    drawPathIfDirty(graphics: Phaser.GameObjects.Graphics, d: string, style?: Partial<SVGStyle> | undefined, options?: RenderOptions | undefined): boolean;
+    drawPathIfDirty(graphics: GameObjects.Graphics, d: string, style?: Partial<SVGStyle> | undefined, options?: RenderOptions | undefined): boolean;
     /** Draw a pre-compiled SVG onto a Graphics object. */
-    drawCompiled(graphics: Phaser.GameObjects.Graphics, compiled: CompiledSVG, options?: SVGPluginOptions | undefined): void;
+    drawCompiled(graphics: GameObjects.Graphics, compiled: CompiledSVG, options?: SVGPluginOptions | undefined): void;
     /** Draw a compiled SVG only when it changed since the last draw. */
-    drawCompiledIfDirty(graphics: Phaser.GameObjects.Graphics, compiled: CompiledSVG, options?: SVGPluginOptions | undefined): boolean;
+    drawCompiledIfDirty(graphics: GameObjects.Graphics, compiled: CompiledSVG, options?: SVGPluginOptions | undefined): boolean;
     /** Force the next dirty-aware draw call to render for this Graphics object. */
-    markDirty(graphics: Phaser.GameObjects.Graphics): this;
+    markDirty(graphics: GameObjects.Graphics): this;
     /** Clear remembered dirty state for this Graphics object. */
-    clearDirtyState(graphics: Phaser.GameObjects.Graphics): this;
+    clearDirtyState(graphics: GameObjects.Graphics): this;
     destroy(): void;
 }
 //# sourceMappingURL=plugin.d.ts.map

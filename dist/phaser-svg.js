@@ -1,5 +1,5 @@
 import { a as e, c as t, d as n, f as r, g as i, h as a, i as o, l as s, m as c, n as l, o as u, p as d, r as f, s as p, t as m, u as h } from "./compiler-CXAcl6q7.js";
-import g from "phaser";
+import { Plugins as g } from "phaser";
 //#region src/dirty-state.ts
 var _ = /* @__PURE__ */ new WeakMap(), v = /* @__PURE__ */ new WeakSet();
 function y(e, t) {
@@ -768,7 +768,7 @@ function Ie(e) {
 }
 //#endregion
 //#region src/plugin.ts
-var Le = class extends g.Plugins.ScenePlugin {
+var Le = class extends g.ScenePlugin {
 	defaultOptions = {};
 	boot() {
 		i(this.systems, "Scene systems not available").events.once("destroy", this.destroy, this);

@@ -1,4 +1,4 @@
-import type Phaser from "phaser"
+import type { GameObjects } from "phaser"
 import {
   parseTransform,
   strokeScaleFromAffine,
@@ -57,7 +57,7 @@ let nextCompiledIdentity = 1
  * Render an SVG `<path>` element's `d` attribute onto a Phaser Graphics object.
  */
 export function drawSVGPath(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   d: string,
   style?: Partial<SVGStyle> | undefined,
   options?: RenderOptions | undefined,
@@ -71,7 +71,7 @@ export function drawSVGPath(
  * Returns true when a draw occurred, false when skipped.
  */
 export function drawSVGPathIfDirty(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   d: string,
   style?: Partial<SVGStyle> | undefined,
   options?: RenderOptions | undefined,
@@ -80,7 +80,7 @@ export function drawSVGPathIfDirty(
 }
 
 function drawSVGPathInternal(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   d: string,
   style?: Partial<SVGStyle> | undefined,
   options?: RenderOptions | undefined,
@@ -106,7 +106,7 @@ function drawSVGPathInternal(
  * Parse an SVG string and render all supported shape elements onto Graphics.
  */
 export function drawSVG(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   svgString: string,
   options?: SVGPluginOptions | undefined,
 ): void {
@@ -119,7 +119,7 @@ export function drawSVG(
  * Returns true when a draw occurred, false when skipped.
  */
 export function drawSVGIfDirty(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   svgString: string,
   options?: SVGPluginOptions | undefined,
 ): boolean {
@@ -127,7 +127,7 @@ export function drawSVGIfDirty(
 }
 
 function drawSVGInternal(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   svgString: string,
   options?: SVGPluginOptions | undefined,
 ): boolean {
@@ -232,7 +232,7 @@ function drawSVGInternal(
  * Render a pre-compiled SVG onto a Graphics object.
  */
 export function drawCompiledSVG(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   compiled: CompiledSVG,
   options?: SVGPluginOptions | undefined,
 ): void {
@@ -245,7 +245,7 @@ export function drawCompiledSVG(
  * Returns true when a draw occurred, false when skipped.
  */
 export function drawCompiledSVGIfDirty(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   compiled: CompiledSVG,
   options?: SVGPluginOptions | undefined,
 ): boolean {
@@ -253,7 +253,7 @@ export function drawCompiledSVGIfDirty(
 }
 
 function drawCompiledSVGInternal(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   compiled: CompiledSVG,
   options?: SVGPluginOptions | undefined,
 ): boolean {
@@ -315,16 +315,14 @@ function drawCompiledSVGInternal(
 /**
  * Force the next dirty-aware draw call for this Graphics object to render.
  */
-export function markSVGDirty(graphics: Phaser.GameObjects.Graphics): void {
+export function markSVGDirty(graphics: GameObjects.Graphics): void {
   markDirtyState(graphics)
 }
 
 /**
  * Clear remembered dirty state for this Graphics object.
  */
-export function clearSVGDirtyState(
-  graphics: Phaser.GameObjects.Graphics,
-): void {
+export function clearSVGDirtyState(graphics: GameObjects.Graphics): void {
   clearDirtyState(graphics)
 }
 
@@ -463,9 +461,7 @@ interface PhaserRendererLike {
   config?: { pathDetailThreshold?: number | undefined } | undefined
 }
 
-function applyGraphicsCrispDefaults(
-  graphics: Phaser.GameObjects.Graphics,
-): void {
+function applyGraphicsCrispDefaults(graphics: GameObjects.Graphics): void {
   const renderer = graphics.scene?.sys?.game?.renderer as
     | PhaserRendererLike
     | undefined

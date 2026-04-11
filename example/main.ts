@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import Phaser from "phaser"
+import { Game, Scene } from "phaser"
 import { drawSVG } from "../src/index.ts"
 import { installBenchmarkPanel, type BenchmarkFixture } from "./benchmark.ts"
 
@@ -301,8 +301,8 @@ for (const tc of testCases) {
   drawWebGL()
 
   // -- Phaser ----------------------------------------------------------------
-  let pluginGame: Phaser.Game | null = null
-  let vanillaPhaserGame: Phaser.Game | null = null
+  let pluginGame: Game | null = null
+  let vanillaPhaserGame: Game | null = null
 
   function resizePhaserCanvas(parentId: string): void {
     requestAnimationFrame(() => {
@@ -321,7 +321,7 @@ for (const tc of testCases) {
       pluginGame.destroy(true)
     }
 
-    class CompareScene extends Phaser.Scene {
+    class CompareScene extends Scene {
       create() {
         const g = this.add.graphics()
         g.setScale(dpr)
@@ -329,7 +329,7 @@ for (const tc of testCases) {
       }
     }
 
-    pluginGame = new Phaser.Game({
+    pluginGame = new Game({
       width: logicalW * dpr,
       height: logicalH * dpr,
       backgroundColor: "#16213e",
@@ -360,7 +360,7 @@ for (const tc of testCases) {
       blobUrlRevoked = true
     }
 
-    class VanillaCompareScene extends Phaser.Scene {
+    class VanillaCompareScene extends Scene {
       preload() {
         this.load.svg(key, svgBlobUrl, {
           width: logicalW * dpr,
@@ -388,7 +388,7 @@ for (const tc of testCases) {
       }
     }
 
-    vanillaPhaserGame = new Phaser.Game({
+    vanillaPhaserGame = new Game({
       width: logicalW * dpr,
       height: logicalH * dpr,
       backgroundColor: "#16213e",

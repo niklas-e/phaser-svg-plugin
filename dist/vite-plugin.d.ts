@@ -1,12 +1,12 @@
 import type { Plugin } from "vite";
 export type { CompiledItem, CompiledPath, CompiledSVG } from "./compiler.ts";
 /**
- * Vite plugin that compiles SVG files into pre-parsed phaser-svg
+ * Vite plugin that compiles SVG files into pre-parsed phaser-svg-plugin
  * draw data at build time.
  *
  * ```ts
  * // vite.config.ts
- * import { phaserSVG } from "phaser-svg/vite"
+ * import { phaserSVG } from "phaser-svg-plugin/vite"
  *
  * export default defineConfig({
  *   plugins: [phaserSVG()],

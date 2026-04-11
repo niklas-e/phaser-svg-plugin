@@ -1,4 +1,4 @@
-import type Phaser from "phaser"
+import type { GameObjects } from "phaser"
 import { assertDefined } from "./assert.ts"
 import { computeSquareCap } from "./line-cap.ts"
 import {
@@ -77,7 +77,7 @@ function isSimplePath(commands: PathCommand[]): boolean {
  * Render parsed SVG path commands onto a Phaser Graphics object.
  */
 export function renderPath(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   commands: PathCommand[],
   style: SVGStyle,
   options?: RenderOptions | undefined,
@@ -124,7 +124,7 @@ export function renderPath(
 // ---------------------------------------------------------------------------
 
 function renderSimplePath(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   commands: PathCommand[],
   style: SVGStyle,
   fillAlpha: number,
@@ -175,7 +175,7 @@ function renderSimplePath(
 // ---------------------------------------------------------------------------
 
 function renderComplexPath(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   commands: PathCommand[],
   style: SVGStyle,
   fillAlpha: number,
@@ -449,7 +449,7 @@ function tessellateArc(
  * rasterization cracks.
  */
 function fillCompoundPath(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   subpaths: ReadonlyArray<{
     points: ReadonlyArray<{ x: number; y: number }>
     closed: boolean
@@ -916,7 +916,7 @@ export function splitSubpaths(commands: PathCommand[]): PathCommand[][] {
  * Handles round (circles) and bevel (triangles) joins.
  */
 function drawLineJoins(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   points: ReadonlyArray<Point2D>,
   closed: boolean,
   style: SVGStyle,
@@ -1031,7 +1031,7 @@ function lineJoinDecorationKey(closed: boolean, style: SVGStyle): string {
 }
 
 function fillPolygon(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   points: ReadonlyArray<Point2D>,
 ): void {
   if (points.length < 3) return

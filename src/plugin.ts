@@ -1,4 +1,4 @@
-import Phaser from "phaser"
+import { type GameObjects, Plugins } from "phaser"
 import { assertDefined } from "./assert.ts"
 import type { CompiledSVG } from "./compiler.ts"
 import {
@@ -32,7 +32,7 @@ export {
  *
  * Register in your game config:
  * ```ts
- * import { SVGPlugin } from "phaser-svg";
+ * import { SVGPlugin } from "phaser-svg-plugin";
  *
  * const config = {
  *   plugins: {
@@ -49,7 +49,7 @@ export {
  * this.svg.draw(graphics, svgString);
  * ```
  */
-export class SVGPlugin extends Phaser.Plugins.ScenePlugin {
+export class SVGPlugin extends Plugins.ScenePlugin {
   private defaultOptions: SVGPluginOptions = {}
 
   boot(): void {
@@ -89,7 +89,7 @@ export class SVGPlugin extends Phaser.Plugins.ScenePlugin {
 
   /** Draw a single SVG path `d` attribute onto a Graphics object. */
   drawPath(
-    graphics: Phaser.GameObjects.Graphics,
+    graphics: GameObjects.Graphics,
     d: string,
     style?: Partial<SVGStyle> | undefined,
     options?: RenderOptions | undefined,
@@ -99,7 +99,7 @@ export class SVGPlugin extends Phaser.Plugins.ScenePlugin {
 
   /** Draw an SVG path only when it changed since the last draw. */
   drawPathIfDirty(
-    graphics: Phaser.GameObjects.Graphics,
+    graphics: GameObjects.Graphics,
     d: string,
     style?: Partial<SVGStyle> | undefined,
     options?: RenderOptions | undefined,
@@ -112,7 +112,7 @@ export class SVGPlugin extends Phaser.Plugins.ScenePlugin {
 
   /** Draw a pre-compiled SVG onto a Graphics object. */
   drawCompiled(
-    graphics: Phaser.GameObjects.Graphics,
+    graphics: GameObjects.Graphics,
     compiled: CompiledSVG,
     options?: SVGPluginOptions | undefined,
   ): void {
@@ -124,7 +124,7 @@ export class SVGPlugin extends Phaser.Plugins.ScenePlugin {
 
   /** Draw a compiled SVG only when it changed since the last draw. */
   drawCompiledIfDirty(
-    graphics: Phaser.GameObjects.Graphics,
+    graphics: GameObjects.Graphics,
     compiled: CompiledSVG,
     options?: SVGPluginOptions | undefined,
   ): boolean {
@@ -135,13 +135,13 @@ export class SVGPlugin extends Phaser.Plugins.ScenePlugin {
   }
 
   /** Force the next dirty-aware draw call to render for this Graphics object. */
-  markDirty(graphics: Phaser.GameObjects.Graphics): this {
+  markDirty(graphics: GameObjects.Graphics): this {
     markSVGDirty(graphics)
     return this
   }
 
   /** Clear remembered dirty state for this Graphics object. */
-  clearDirtyState(graphics: Phaser.GameObjects.Graphics): this {
+  clearDirtyState(graphics: GameObjects.Graphics): this {
     clearSVGDirtyState(graphics)
     return this
   }

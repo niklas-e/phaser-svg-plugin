@@ -1,4 +1,4 @@
-import type Phaser from "phaser"
+import type { GameObjects } from "phaser"
 import type { SVGStyle } from "./types.ts"
 
 export type NativeShape =
@@ -65,7 +65,7 @@ export function transformNativeShape(
 }
 
 export function drawNativeShape(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   shape: NativeShape,
   style: SVGStyle,
 ): void {
@@ -120,7 +120,7 @@ function getNativeRadii(shape: NativeShape): {
 }
 
 function drawNativeStrokeRing(
-  graphics: Phaser.GameObjects.Graphics,
+  graphics: GameObjects.Graphics,
   shape: NativeShape,
   stroke: number,
   strokeAlpha: number,
