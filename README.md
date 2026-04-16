@@ -111,8 +111,16 @@ import { defineConfig } from "vite"
 import { phaserSVG } from "phaser-svg/vite"
 
 export default defineConfig({
-  plugins: [phaserSVG()],
+  // Global default for all compiled SVG modules.
+  plugins: [phaserSVG({ msaaSamples: 8 })],
 })
+```
+
+The Vite plugin `msaaSamples` value is embedded into compiled SVG output as a
+default. You can still override it per draw call:
+
+```ts
+drawCompiledSVG(graphics, heart, { msaaSamples: 4 })
 ```
 
 **scene.ts**
@@ -263,6 +271,7 @@ this.svg.setDefaults({
 | `curveResolution` | `number` | Points per curve for tessellation (default `32`) |
 | `overrideFill` | `number` | Force fill colour for all shapes |
 | `overrideStroke` | `number` | Force stroke colour for all shapes |
+| `msaaSamples` | `4 \| 8` | MSAA sample count. Default is `4` (quality-first). `8` downgrades to `4` when unsupported. |
 
 For small UI icons, the plugin automatically disables Phaser Graphics path
 simplification for plugin draw calls to preserve detail.
