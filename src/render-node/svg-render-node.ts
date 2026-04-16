@@ -23,6 +23,10 @@ interface PhaserRendererForStep {
   deleteTexture(texture: { webGLTexture: WebGLTexture | null }): void
 }
 
+interface PhaserQuadBatchNode {
+  batch(...args: unknown[]): void
+}
+
 interface PhaserDrawingContext {
   width: number
   height: number
@@ -56,6 +60,11 @@ interface MsaaStepState {
   resources: MsaaResources
   caps: MsaaCapabilities
   samples: MsaaSamples
+  requestedSamples: MsaaSamples
+  negotiatedWidth: number
+  negotiatedHeight: number
+  quadNodeRenderer: PhaserRendererForStep | null
+  quadBatchNode: PhaserQuadBatchNode | null
   detachContextLost: (() => void) | null
 }
 
@@ -74,6 +83,31 @@ export function attachMsaaRenderStep(
   renderer: PhaserRendererForStep,
   requestedSamples: MsaaSamples,
 ): void {
+  const existing = msaaStateMap.get(graphics)
+
+  if (existing) {
+    const shouldRenegotiate =
+      existing.requestedSamples !== requestedSamples ||
+      existing.negotiatedWidth !== renderer.width ||
+      existing.negotiatedHeight !== renderer.height
+
+    if (shouldRenegotiate) {
+      // Update sample count only when request or renderer size changes.
+      // Resources will rebuild on next draw if the negotiated sample count differs.
+      existing.samples = negotiateSamples(
+        requestedSamples,
+        existing.caps,
+        renderer.width,
+        renderer.height,
+      )
+      existing.requestedSamples = requestedSamples
+      existing.negotiatedWidth = renderer.width
+      existing.negotiatedHeight = renderer.height
+    }
+
+    return
+  }
+
   const caps = detectMsaaCapabilities(
     renderer as unknown as Parameters<typeof detectMsaaCapabilities>[0],
   )
@@ -92,19 +126,16 @@ export function attachMsaaRenderStep(
     renderer.height,
   )
 
-  const existing = msaaStateMap.get(graphics)
-
-  if (existing) {
-    // Update sample count if changed; resources will rebuild on next draw.
-    existing.samples = samples
-    return
-  }
-
   const resources = new MsaaResources(caps.backend)
   const state: MsaaStepState = {
     resources,
     caps,
     samples,
+    requestedSamples,
+    negotiatedWidth: renderer.width,
+    negotiatedHeight: renderer.height,
+    quadNodeRenderer: null,
+    quadBatchNode: null,
     detachContextLost: null,
   }
   msaaStateMap.set(graphics, state)
@@ -222,7 +253,12 @@ function buildRenderStepFn(state: MsaaStepState): (...args: unknown[]) => void {
     // 8. Composite the resolved texture over the scene with a full-screen quad.
     const w = ctx.width
     const h = ctx.height
-    renderNodes.getNode("BatchHandlerQuadSingle").batch(
+    if (!state.quadBatchNode || state.quadNodeRenderer !== r) {
+      state.quadBatchNode = renderNodes.getNode("BatchHandlerQuadSingle")
+      state.quadNodeRenderer = r
+    }
+
+    state.quadBatchNode.batch(
       ctx,
       resolvedTexture,
       // TL:

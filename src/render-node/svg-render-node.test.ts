@@ -18,6 +18,7 @@ class FakeWebGL2Context {
   readonly NEAREST = 0x2600
 
   private boundRenderbuffer: WebGLRenderbuffer | null = null
+  multisampleAllocations: number[] = []
 
   getParameter(param: number): unknown {
     if (param === this.MAX_SAMPLES) {
@@ -49,11 +50,13 @@ class FakeWebGL2Context {
 
   renderbufferStorageMultisample(
     _target: number,
-    _samples: number,
+    samples: number,
     _internalFormat: number,
     _width: number,
     _height: number,
-  ): void {}
+  ): void {
+    this.multisampleAllocations.push(samples)
+  }
 
   framebufferRenderbuffer(
     _target: number,
@@ -201,6 +204,7 @@ function createRenderer(gl: FakeWebGL2Context): {
   gl: FakeWebGL2Context
   width: number
   height: number
+  getNodeCalls: number
   renderNodes: {
     finishBatch(): void
     getNode(name: string): { batch(...args: unknown[]): void }
@@ -213,15 +217,19 @@ function createRenderer(gl: FakeWebGL2Context): {
   ): { webGLTexture: WebGLTexture | null }
   deleteTexture(texture: { webGLTexture: WebGLTexture | null }): void
 } {
-  return {
+  const renderer = {
     gl,
     width: 320,
     height: 180,
+    getNodeCalls: 0,
     renderNodes: {
       finishBatch: () => {},
-      getNode: (_name: string) => ({
-        batch: (..._args: unknown[]) => {},
-      }),
+      getNode: (_name: string) => {
+        renderer.getNodeCalls += 1
+        return {
+          batch: (..._args: unknown[]) => {},
+        }
+      },
     },
     createTextureFromSource: (
       _source: null,
@@ -231,6 +239,8 @@ function createRenderer(gl: FakeWebGL2Context): {
     ) => ({ webGLTexture: {} as WebGLTexture }),
     deleteTexture: (_texture: { webGLTexture: WebGLTexture | null }) => {},
   }
+
+  return renderer
 }
 
 describe("attachMsaaRenderStep render-step forwarding", () => {
@@ -352,6 +362,96 @@ describe("attachMsaaRenderStep render-step forwarding", () => {
       assert.equal(forwarded?.[4], 3)
       assert.equal(forwarded?.[5], displayList)
       assert.equal(forwarded?.[6], displayListIndex)
+    })
+  })
+
+  it("renegotiates samples when renderer size changes", () => {
+    withFakeWebGL2Context(() => {
+      const gl = new FakeWebGL2Context()
+      const renderer = createRenderer(gl)
+      const graphics = new FakeGraphics()
+
+      renderer.width = 1600
+      renderer.height = 1200
+
+      attachMsaaRenderStep(
+        graphics as unknown as Phaser.GameObjects.Graphics,
+        renderer as unknown as Parameters<typeof attachMsaaRenderStep>[1],
+        8,
+      )
+
+      const step = graphics._renderSteps[0]
+      assert.ok(step)
+
+      step(
+        renderer,
+        graphics,
+        new FakeDrawingContext(renderer.width, renderer.height),
+        undefined,
+        0,
+        undefined,
+        undefined,
+      )
+
+      renderer.width = 2200
+      renderer.height = 1600
+
+      attachMsaaRenderStep(
+        graphics as unknown as Phaser.GameObjects.Graphics,
+        renderer as unknown as Parameters<typeof attachMsaaRenderStep>[1],
+        8,
+      )
+
+      step(
+        renderer,
+        graphics,
+        new FakeDrawingContext(renderer.width, renderer.height),
+        undefined,
+        0,
+        undefined,
+        undefined,
+      )
+
+      assert.deepEqual(gl.multisampleAllocations, [8, 4])
+    })
+  })
+
+  it("caches BatchHandlerQuadSingle node lookup per renderer", () => {
+    withFakeWebGL2Context(() => {
+      const gl = new FakeWebGL2Context()
+      const renderer = createRenderer(gl)
+      const graphics = new FakeGraphics()
+
+      attachMsaaRenderStep(
+        graphics as unknown as Phaser.GameObjects.Graphics,
+        renderer as unknown as Parameters<typeof attachMsaaRenderStep>[1],
+        4,
+      )
+
+      const step = graphics._renderSteps[0]
+      assert.ok(step)
+
+      step(
+        renderer,
+        graphics,
+        new FakeDrawingContext(320, 180),
+        undefined,
+        0,
+        undefined,
+        undefined,
+      )
+
+      step(
+        renderer,
+        graphics,
+        new FakeDrawingContext(320, 180),
+        undefined,
+        0,
+        undefined,
+        undefined,
+      )
+
+      assert.equal(renderer.getNodeCalls, 1)
     })
   })
 })
