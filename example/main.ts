@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import { Game, Scene } from "phaser"
+import { Game, Scene, WEBGL } from "phaser"
 import { drawSVG } from "../src/index.ts"
 import { installBenchmarkPanel, type BenchmarkFixture } from "./benchmark.ts"
 
@@ -323,18 +323,41 @@ for (const tc of testCases) {
 
     class CompareScene extends Scene {
       create() {
+        const renderer = this.sys.game
+          .renderer as Phaser.Renderer.WebGL.WebGLRenderer
+        if (!(renderer.gl instanceof WebGL2RenderingContext)) {
+          throw new Error(
+            "phaser-svg example: expected WebGL2 renderer context for MSAA",
+          )
+        }
+
         const g = this.add.graphics()
         g.setScale(dpr)
-        drawSVG(g, svg, { width: logicalW, height: logicalH })
+        drawSVG(g, svg, { width: logicalW, height: logicalH, msaaSamples: 4 })
       }
+    }
+
+    // MSAA requires a WebGL2 context.
+    const msaaCanvas = document.createElement("canvas")
+    const gl2 = msaaCanvas.getContext("webgl2") as WebGL2RenderingContext | null
+    if (!gl2) {
+      throw new Error(
+        "WebGL2 is required for MSAA but is not available in this browser.",
+      )
     }
 
     pluginGame = new Game({
       width: logicalW * dpr,
       height: logicalH * dpr,
+      type: WEBGL,
       backgroundColor: "#16213e",
       scene: CompareScene,
       parent: phaserParentId,
+      canvas: msaaCanvas,
+      // @ts-expect-error Phaser v4 typings currently restrict GameConfig.context
+      // to CanvasRenderingContext2D, but WebGLRenderer accepts a provided GL context.
+      // We intentionally pass WebGL2 to force MSAA-capable rendering.
+      context: gl2,
       banner: false,
     })
 
