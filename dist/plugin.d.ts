@@ -1,9 +1,8 @@
 import { type GameObjects, Plugins } from "phaser";
 import type { CompiledSVG } from "./compiler.ts";
-import { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, drawSVG, drawSVGIfDirty, drawSVGPath, drawSVGPathIfDirty, markSVGDirty, type SVGPluginOptions } from "./draw.ts";
-import type { RenderOptions } from "./renderer.ts";
+import { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, type SVGPathOptions, drawSVG, drawSVGIfDirty, drawSVGPath, drawSVGPathIfDirty, markSVGDirty, type SVGPluginOptions } from "./draw.ts";
 import type { SVGStyle } from "./types.ts";
-export { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, drawSVG, drawSVGIfDirty, drawSVGPath, drawSVGPathIfDirty, markSVGDirty, type SVGPluginOptions, };
+export { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, drawSVG, drawSVGIfDirty, drawSVGPath, drawSVGPathIfDirty, markSVGDirty, type SVGPathOptions, type SVGPluginOptions, };
 /**
  * Phaser v4 Scene Plugin — adds `this.svg` to every Scene.
  *
@@ -36,9 +35,9 @@ export declare class SVGPlugin extends Plugins.ScenePlugin {
     /** Draw an SVG string only when it changed since the last draw. */
     drawIfDirty(graphics: Phaser.GameObjects.Graphics, svgString: string, options?: SVGPluginOptions | undefined): boolean;
     /** Draw a single SVG path `d` attribute onto a Graphics object. */
-    drawPath(graphics: GameObjects.Graphics, d: string, style?: Partial<SVGStyle> | undefined, options?: RenderOptions | undefined): void;
+    drawPath(graphics: GameObjects.Graphics, d: string, style?: Partial<SVGStyle> | undefined, options?: SVGPathOptions | undefined): void;
     /** Draw an SVG path only when it changed since the last draw. */
-    drawPathIfDirty(graphics: GameObjects.Graphics, d: string, style?: Partial<SVGStyle> | undefined, options?: RenderOptions | undefined): boolean;
+    drawPathIfDirty(graphics: GameObjects.Graphics, d: string, style?: Partial<SVGStyle> | undefined, options?: SVGPathOptions | undefined): boolean;
     /** Draw a pre-compiled SVG onto a Graphics object. */
     drawCompiled(graphics: GameObjects.Graphics, compiled: CompiledSVG, options?: SVGPluginOptions | undefined): void;
     /** Draw a compiled SVG only when it changed since the last draw. */

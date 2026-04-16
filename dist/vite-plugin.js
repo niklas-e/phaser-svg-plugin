@@ -1,14 +1,14 @@
-import { t as e } from "./compiler-CXAcl6q7.js";
+import { t as e } from "./compiler-2DWgYub9.js";
 import { readFile as t } from "node:fs/promises";
 //#region src/vite-plugin.ts
-function n() {
+function n(n = {}) {
 	return {
 		name: "phaser-svg",
 		enforce: "pre",
-		async load(n) {
-			if (!n.endsWith(".svg")) return null;
-			let r = e(await t(n, "utf-8"));
-			return `export default ${JSON.stringify(r)};`;
+		async load(r) {
+			if (!r.endsWith(".svg")) return null;
+			let i = e(await t(r, "utf-8"), { msaaSamples: n.msaaSamples });
+			return `export default ${JSON.stringify(i)};`;
 		}
 	};
 }

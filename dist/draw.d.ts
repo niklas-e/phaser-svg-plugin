@@ -1,7 +1,10 @@
 import type { GameObjects } from "phaser";
 import type { CompiledSVG } from "./compiler.ts";
 import { type RenderOptions } from "./renderer.ts";
+import type { MsaaOptions, MsaaSamples } from "./render-node/types.ts";
 import type { SVGStyle } from "./types.ts";
+export interface SVGPathOptions extends RenderOptions, MsaaOptions {
+}
 export interface SVGPluginOptions extends RenderOptions {
     /** Override fill color for all elements. */
     overrideFill?: number | undefined;
@@ -11,17 +14,23 @@ export interface SVGPluginOptions extends RenderOptions {
     width?: number | undefined;
     /** Target height — scales the SVG viewBox to fit. */
     height?: number | undefined;
+    /**
+     * MSAA sample count for anti-aliasing SVG edges.
+     * - `4` (default): 4x MSAA.
+     * - `8`: 8x MSAA — automatically downgrades to x4 when unsupported.
+     */
+    msaaSamples?: MsaaSamples | undefined;
 }
 /**
  * Render an SVG `<path>` element's `d` attribute onto a Phaser Graphics object.
  */
-export declare function drawSVGPath(graphics: GameObjects.Graphics, d: string, style?: Partial<SVGStyle> | undefined, options?: RenderOptions | undefined): void;
+export declare function drawSVGPath(graphics: GameObjects.Graphics, d: string, style?: Partial<SVGStyle> | undefined, options?: SVGPathOptions | undefined): void;
 /**
  * Boolean-return alias of `drawSVGPath`.
  *
  * Returns true when a draw occurred, false when skipped.
  */
-export declare function drawSVGPathIfDirty(graphics: GameObjects.Graphics, d: string, style?: Partial<SVGStyle> | undefined, options?: RenderOptions | undefined): boolean;
+export declare function drawSVGPathIfDirty(graphics: GameObjects.Graphics, d: string, style?: Partial<SVGStyle> | undefined, options?: SVGPathOptions | undefined): boolean;
 /**
  * Parse an SVG string and render all supported shape elements onto Graphics.
  */
