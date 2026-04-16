@@ -47,6 +47,7 @@ interface MsaaStepState {
   resources: MsaaResources
   caps: MsaaCapabilities
   samples: MsaaSamples
+  detachContextLost: (() => void) | null
 }
 
 const msaaStateMap = new WeakMap<object, MsaaStepState>()
@@ -91,7 +92,12 @@ export function attachMsaaRenderStep(
   }
 
   const resources = new MsaaResources(caps.backend)
-  const state: MsaaStepState = { resources, caps, samples }
+  const state: MsaaStepState = {
+    resources,
+    caps,
+    samples,
+    detachContextLost: null,
+  }
   msaaStateMap.set(graphics, state)
 
   // Install the MSAA step at index 0 so the original Graphics render is at index 1.
@@ -107,6 +113,7 @@ export function attachMsaaRenderStep(
       s.resources.destroy(
         renderer as unknown as Parameters<MsaaResources["destroy"]>[0],
       )
+      s.detachContextLost?.()
       msaaStateMap.delete(graphics)
     }
   })
@@ -114,19 +121,24 @@ export function attachMsaaRenderStep(
   // On WebGL context loss, invalidate resources so they are rebuilt on the next draw.
   // The context-restored event on the renderer re-creates the GL context; our
   // ensureResources guard (webGLTexture === null check) triggers a full rebuild.
-  const rendererEvents = (
-    renderer as unknown as { on?: (...a: unknown[]) => void }
-  ).on
-  if (typeof rendererEvents === "function") {
-    ;(renderer as unknown as { on(e: string, fn: () => void): void }).on(
-      "contextlost",
-      () => {
-        // Resources become invalid; ensureResources will rebuild on next draw.
-        state.resources.destroy(
-          renderer as unknown as Parameters<MsaaResources["destroy"]>[0],
-        )
-      },
-    )
+  const rendererEvents = renderer as unknown as {
+    on?: ((event: string, fn: () => void) => void) | undefined
+    off?: ((event: string, fn: () => void) => void) | undefined
+  }
+  if (typeof rendererEvents.on === "function") {
+    const onContextLost = () => {
+      // Resources become invalid; ensureResources will rebuild on next draw.
+      state.resources.destroy(
+        renderer as unknown as Parameters<MsaaResources["destroy"]>[0],
+      )
+    }
+    rendererEvents.on("contextlost", onContextLost)
+    state.detachContextLost =
+      typeof rendererEvents.off === "function"
+        ? () => {
+            rendererEvents.off?.("contextlost", onContextLost)
+          }
+        : null
   }
 }
 
@@ -183,12 +195,9 @@ function buildRenderStepFn(state: MsaaStepState): (...args: unknown[]) => void {
     renderNodes.finishBatch()
 
     // 6. Resolve MSAA to the resolved texture.
-    //    WebGL2: explicit blit. EXT: auto-resolves when MSAA FBO is unbound.
-    if (state.caps.backend === "webgl2") {
-      state.resources.blitResolve(gl as WebGL2RenderingContext)
-    }
+    state.resources.blitResolve(gl as WebGL2RenderingContext)
 
-    // 7. Restore the original scene framebuffer (also triggers EXT auto-resolve).
+    // 7. Restore the original scene framebuffer.
     ctx.beginDraw()
 
     // 8. Composite the resolved texture over the scene with a full-screen quad.

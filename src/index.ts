@@ -14,6 +14,7 @@ export {
   drawSVGPath,
   drawSVGPathIfDirty,
   markSVGDirty,
+  type SVGPathOptions,
   type SVGPluginOptions,
 } from "./draw.ts"
 export { parsePath } from "./path-parser.ts"

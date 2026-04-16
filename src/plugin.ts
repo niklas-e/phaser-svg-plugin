@@ -5,6 +5,7 @@ import {
   clearSVGDirtyState,
   drawCompiledSVG,
   drawCompiledSVGIfDirty,
+  type SVGPathOptions,
   drawSVG,
   drawSVGIfDirty,
   drawSVGPath,
@@ -12,7 +13,6 @@ import {
   markSVGDirty,
   type SVGPluginOptions,
 } from "./draw.ts"
-import type { RenderOptions } from "./renderer.ts"
 import type { SVGStyle } from "./types.ts"
 
 export {
@@ -24,6 +24,7 @@ export {
   drawSVGPath,
   drawSVGPathIfDirty,
   markSVGDirty,
+  type SVGPathOptions,
   type SVGPluginOptions,
 }
 
@@ -50,7 +51,7 @@ export {
  * ```
  */
 export class SVGPlugin extends Plugins.ScenePlugin {
-  private defaultOptions: SVGPluginOptions = {}
+  private defaultOptions: SVGPluginOptions = { msaaSamples: 4 }
 
   boot(): void {
     const events = assertDefined(
@@ -92,9 +93,13 @@ export class SVGPlugin extends Plugins.ScenePlugin {
     graphics: GameObjects.Graphics,
     d: string,
     style?: Partial<SVGStyle> | undefined,
-    options?: RenderOptions | undefined,
+    options?: SVGPathOptions | undefined,
   ): void {
-    drawSVGPath(graphics, d, style, { ...this.defaultOptions, ...options })
+    const pathDefaults: SVGPathOptions = {
+      curveResolution: this.defaultOptions.curveResolution,
+      msaaSamples: this.defaultOptions.msaaSamples,
+    }
+    drawSVGPath(graphics, d, style, { ...pathDefaults, ...options })
   }
 
   /** Draw an SVG path only when it changed since the last draw. */
@@ -102,10 +107,14 @@ export class SVGPlugin extends Plugins.ScenePlugin {
     graphics: GameObjects.Graphics,
     d: string,
     style?: Partial<SVGStyle> | undefined,
-    options?: RenderOptions | undefined,
+    options?: SVGPathOptions | undefined,
   ): boolean {
+    const pathDefaults: SVGPathOptions = {
+      curveResolution: this.defaultOptions.curveResolution,
+      msaaSamples: this.defaultOptions.msaaSamples,
+    }
     return drawSVGPathIfDirty(graphics, d, style, {
-      ...this.defaultOptions,
+      ...pathDefaults,
       ...options,
     })
   }

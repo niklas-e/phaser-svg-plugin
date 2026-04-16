@@ -25,12 +25,14 @@ import {
 import { applyCrispPathDetailThreshold } from "./quality.ts"
 import { type RenderOptions, renderPath } from "./renderer.ts"
 import { attachMsaaRenderStep } from "./render-node/svg-render-node.ts"
-import type { MsaaSamples } from "./render-node/types.ts"
+import type { MsaaOptions, MsaaSamples } from "./render-node/types.ts"
 import { convertShape } from "./shape.ts"
 import { isInsideNonRenderableContainer } from "./svg-structure.ts"
 import { resolveStyle } from "./style.ts"
 import { transformCommands, viewBoxTransform } from "./transform.ts"
 import type { SVGStyle, ViewBox } from "./types.ts"
+
+export interface SVGPathOptions extends RenderOptions, MsaaOptions {}
 
 export interface SVGPluginOptions extends RenderOptions {
   /** Override fill color for all elements. */
@@ -43,9 +45,8 @@ export interface SVGPluginOptions extends RenderOptions {
   height?: number | undefined
   /**
    * MSAA sample count for anti-aliasing SVG edges.
-   * - `4` (default when specified): 4x MSAA.
+   * - `4` (default): 4x MSAA.
    * - `8`: 8x MSAA — automatically downgrades to x4 when unsupported.
-   * Omit to use the current path (no MSAA) during the transition period.
    */
   msaaSamples?: MsaaSamples | undefined
 }
@@ -69,7 +70,7 @@ export function drawSVGPath(
   graphics: GameObjects.Graphics,
   d: string,
   style?: Partial<SVGStyle> | undefined,
-  options?: RenderOptions | undefined,
+  options?: SVGPathOptions | undefined,
 ): void {
   drawSVGPathInternal(graphics, d, style, options)
 }
@@ -83,7 +84,7 @@ export function drawSVGPathIfDirty(
   graphics: GameObjects.Graphics,
   d: string,
   style?: Partial<SVGStyle> | undefined,
-  options?: RenderOptions | undefined,
+  options?: SVGPathOptions | undefined,
 ): boolean {
   return drawSVGPathInternal(graphics, d, style, options)
 }
@@ -92,9 +93,9 @@ function drawSVGPathInternal(
   graphics: GameObjects.Graphics,
   d: string,
   style?: Partial<SVGStyle> | undefined,
-  options?: RenderOptions | undefined,
+  options?: SVGPathOptions | undefined,
 ): boolean {
-  const stateKey = `path|${d}|${styleStateKey(style)}|${renderOptionsStateKey(options)}`
+  const stateKey = `path|${d}|${styleStateKey(style)}|${pathOptionsStateKey(options)}`
   if (!isDirtyForState(graphics, stateKey)) {
     return false
   }
@@ -107,10 +108,7 @@ function drawSVGPathInternal(
   const commands = parsePath(d)
   const resolved = resolveStyleWithOverrides(style)
   renderPath(graphics, commands, resolved, options)
-  applyMsaaIfNeeded(
-    graphics,
-    (options as SVGPluginOptions | undefined)?.msaaSamples,
-  )
+  applyMsaaIfNeeded(graphics, options?.msaaSamples)
   commitDirtyState(graphics, stateKey)
   return true
 }
@@ -306,6 +304,7 @@ function drawCompiledSVGInternal(
       }
     }
 
+    applyMsaaIfNeeded(graphics, options?.msaaSamples)
     commitDirtyState(graphics, stateKey)
     return true
   }
@@ -477,7 +476,7 @@ interface PhaserRendererLike {
 }
 
 interface PhaserRendererForMsaa {
-  gl: WebGLRenderingContext
+  gl?: WebGLRenderingContext | null
   width: number
   height: number
   renderNodes: {
@@ -508,16 +507,21 @@ function applyMsaaIfNeeded(
   graphics: GameObjects.Graphics,
   msaaSamples: MsaaSamples | undefined,
 ): void {
-  if (!msaaSamples) return
+  const resolvedSamples: MsaaSamples = msaaSamples ?? 4
   const renderer = graphics.scene?.sys?.game?.renderer as unknown as
     | PhaserRendererForMsaa
     | null
     | undefined
-  if (!renderer?.gl) return
+  if (!renderer?.gl) {
+    throw new Error(
+      "phaser-svg MSAA: a WebGL renderer is required. " +
+        "Create the game with WebGL + WebGL2 context, or do not use this plugin in non-WebGL environments.",
+    )
+  }
   attachMsaaRenderStep(
     graphics,
     renderer as unknown as Parameters<typeof attachMsaaRenderStep>[1],
-    msaaSamples,
+    resolvedSamples,
   )
 }
 
@@ -595,12 +599,12 @@ function pluginOptionsStateKey(options: SVGPluginOptions | undefined): string {
     options?.overrideStroke,
     options?.width,
     options?.height,
-    options?.msaaSamples,
+    options?.msaaSamples ?? 4,
   ].join("|")
 }
 
-function renderOptionsStateKey(options: RenderOptions | undefined): string {
-  return String(options?.curveResolution)
+function pathOptionsStateKey(options: SVGPathOptions | undefined): string {
+  return [options?.curveResolution, options?.msaaSamples ?? 4].join("|")
 }
 
 function styleStateKey(style: Partial<SVGStyle> | undefined): string {

@@ -74,8 +74,7 @@ export function negotiateSamples(
     throw new Error(
       `phaser-svg MSAA: device maximum sample count is ${caps.maxSamples}, ` +
         `which is less than the minimum required 4. ` +
-        `To fix: remove msaaSamples from your draw options, ` +
-        `or ensure your WebGL context supports at least x4 multisampling.`,
+        `To fix: run with a WebGL2 renderer on hardware that supports at least x4 multisampling.`,
     )
   }
 
@@ -85,8 +84,7 @@ export function negotiateSamples(
     throw new Error(
       `phaser-svg MSAA: the MSAA render target for ${rendererWidth}x${rendererHeight} ` +
         `at x4 samples would require ${mib} MiB (budget is 96 MiB). ` +
-        `To fix: lower the game canvas size, set msaaTargetScale to a value less than 1, ` +
-        `or split large SVG draws into smaller Graphics objects.`,
+        `To fix: lower the game canvas size, or split large SVG draws into smaller Graphics objects.`,
     )
   }
 
