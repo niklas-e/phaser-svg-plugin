@@ -24,6 +24,8 @@ import {
 } from "./dirty-state.ts"
 import { applyCrispPathDetailThreshold } from "./quality.ts"
 import { type RenderOptions, renderPath } from "./renderer.ts"
+import { attachMsaaRenderStep } from "./render-node/svg-render-node.ts"
+import type { MsaaSamples } from "./render-node/types.ts"
 import { convertShape } from "./shape.ts"
 import { isInsideNonRenderableContainer } from "./svg-structure.ts"
 import { resolveStyle } from "./style.ts"
@@ -39,6 +41,13 @@ export interface SVGPluginOptions extends RenderOptions {
   width?: number | undefined
   /** Target height — scales the SVG viewBox to fit. */
   height?: number | undefined
+  /**
+   * MSAA sample count for anti-aliasing SVG edges.
+   * - `4` (default when specified): 4x MSAA.
+   * - `8`: 8x MSAA — automatically downgrades to x4 when unsupported.
+   * Omit to use the current path (no MSAA) during the transition period.
+   */
+  msaaSamples?: MsaaSamples | undefined
 }
 
 const transformedItemCache = new WeakMap<
@@ -98,6 +107,10 @@ function drawSVGPathInternal(
   const commands = parsePath(d)
   const resolved = resolveStyleWithOverrides(style)
   renderPath(graphics, commands, resolved, options)
+  applyMsaaIfNeeded(
+    graphics,
+    (options as SVGPluginOptions | undefined)?.msaaSamples,
+  )
   commitDirtyState(graphics, stateKey)
   return true
 }
@@ -224,6 +237,7 @@ function drawSVGInternal(
     renderPath(graphics, commands, style, options)
   }
 
+  applyMsaaIfNeeded(graphics, options?.msaaSamples)
   commitDirtyState(graphics, stateKey)
   return true
 }
@@ -308,6 +322,7 @@ function drawCompiledSVGInternal(
     renderPath(graphics, path.commands, style, options)
   }
 
+  applyMsaaIfNeeded(graphics, options?.msaaSamples)
   commitDirtyState(graphics, stateKey)
   return true
 }
@@ -461,11 +476,49 @@ interface PhaserRendererLike {
   config?: { pathDetailThreshold?: number | undefined } | undefined
 }
 
+interface PhaserRendererForMsaa {
+  gl: WebGLRenderingContext
+  width: number
+  height: number
+  renderNodes: {
+    finishBatch(): void
+    getNode(name: string): unknown
+  }
+  createTextureFromSource(
+    source: null,
+    width: number,
+    height: number,
+    scaleMode: number,
+  ): { webGLTexture: WebGLTexture | null } | null
+  deleteTexture(texture: { webGLTexture: WebGLTexture | null }): void
+}
+
 function applyGraphicsCrispDefaults(graphics: GameObjects.Graphics): void {
   const renderer = graphics.scene?.sys?.game?.renderer as
     | PhaserRendererLike
     | undefined
   applyCrispPathDetailThreshold(renderer?.config)
+}
+
+/**
+ * Attach the MSAA render step if msaaSamples is requested and a WebGL renderer is available.
+ * Safe to call every frame — the step is only installed once and updated if sample count changes.
+ */
+function applyMsaaIfNeeded(
+  graphics: GameObjects.Graphics,
+  msaaSamples: MsaaSamples | undefined,
+): void {
+  if (!msaaSamples) return
+  const renderer = graphics.scene?.sys?.game?.renderer as unknown as
+    | PhaserRendererForMsaa
+    | null
+    | undefined
+  if (!renderer?.gl) return
+  attachMsaaRenderStep(
+    graphics,
+    renderer as unknown as Parameters<typeof attachMsaaRenderStep>[1],
+    msaaSamples,
+  )
 }
 
 function resolveStyleWithOverrides(
@@ -542,6 +595,7 @@ function pluginOptionsStateKey(options: SVGPluginOptions | undefined): string {
     options?.overrideStroke,
     options?.width,
     options?.height,
+    options?.msaaSamples,
   ].join("|")
 }
 

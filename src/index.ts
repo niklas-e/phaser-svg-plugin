@@ -18,6 +18,7 @@ export {
 } from "./draw.ts"
 export { parsePath } from "./path-parser.ts"
 export { SVGPlugin } from "./plugin.ts"
+export type { MsaaOptions, MsaaSamples } from "./render-node/types.ts"
 export { type RenderOptions, renderPath } from "./renderer.ts"
 export { convertShape, type ConvertedShape } from "./shape.ts"
 export { resolveStyle } from "./style.ts"
