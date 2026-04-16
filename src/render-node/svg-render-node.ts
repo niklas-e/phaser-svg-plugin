@@ -37,6 +37,15 @@ interface PhaserGraphics {
   _renderSteps: ((...args: unknown[]) => void)[]
   addRenderStep(fn: (...args: unknown[]) => void, index?: number): void
   once(event: string, fn: (...args: unknown[]) => void): void
+  renderWebGLStep(
+    renderer: unknown,
+    gameObject: unknown,
+    drawingContext: unknown,
+    parentMatrix: unknown,
+    renderStep: number,
+    displayList: unknown,
+    displayListIndex: unknown,
+  ): void
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +160,10 @@ function buildRenderStepFn(state: MsaaStepState): (...args: unknown[]) => void {
     renderer: unknown,
     gameObject: unknown,
     drawingContext: unknown,
+    parentMatrix: unknown,
+    renderStep: unknown,
+    displayList: unknown,
+    displayListIndex: unknown,
   ): void {
     const r = renderer as PhaserRendererForStep
     const g = gameObject as PhaserGraphics
@@ -185,11 +198,17 @@ function buildRenderStepFn(state: MsaaStepState): (...args: unknown[]) => void {
     gl.clearColor(0, 0, 0, 0)
     gl.clear(gl.COLOR_BUFFER_BIT)
 
-    // 4. Execute the original Graphics renderWebGL step with the MSAA context.
-    const originalStep = g._renderSteps[1]
-    if (originalStep) {
-      originalStep(r, gameObject, msaaCtx)
-    }
+    // 4. Dispatch the next Graphics render step with full Phaser context.
+    //    Advancing to N+1 avoids recursion while preserving render pipeline state.
+    g.renderWebGLStep(
+      r,
+      gameObject,
+      msaaCtx,
+      parentMatrix,
+      (typeof renderStep === "number" ? renderStep : 0) + 1,
+      displayList,
+      displayListIndex,
+    )
 
     // 5. Flush remaining batched geometry into the MSAA FBO.
     renderNodes.finishBatch()
