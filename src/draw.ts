@@ -269,7 +269,8 @@ function drawCompiledSVGInternal(
   compiled: CompiledSVG,
   options?: SVGPluginOptions | undefined,
 ): boolean {
-  const stateKey = `compiled|${compiledIdentity(compiled)}|${pluginOptionsStateKey(options)}`
+  const compiledMsaaSamples = resolveCompiledMsaaSamples(compiled, options)
+  const stateKey = `compiled|${compiledIdentity(compiled)}|${compiledOptionsStateKey(options, compiledMsaaSamples)}`
   if (!isDirtyForState(graphics, stateKey)) {
     return false
   }
@@ -304,7 +305,7 @@ function drawCompiledSVGInternal(
       }
     }
 
-    applyMsaaIfNeeded(graphics, options?.msaaSamples)
+    applyMsaaIfNeeded(graphics, compiledMsaaSamples)
     commitDirtyState(graphics, stateKey)
     return true
   }
@@ -321,7 +322,7 @@ function drawCompiledSVGInternal(
     renderPath(graphics, path.commands, style, options)
   }
 
-  applyMsaaIfNeeded(graphics, options?.msaaSamples)
+  applyMsaaIfNeeded(graphics, compiledMsaaSamples)
   commitDirtyState(graphics, stateKey)
   return true
 }
@@ -601,6 +602,27 @@ function pluginOptionsStateKey(options: SVGPluginOptions | undefined): string {
     options?.height,
     options?.msaaSamples ?? 4,
   ].join("|")
+}
+
+function compiledOptionsStateKey(
+  options: SVGPluginOptions | undefined,
+  resolvedMsaaSamples: MsaaSamples,
+): string {
+  return [
+    options?.curveResolution,
+    options?.overrideFill,
+    options?.overrideStroke,
+    options?.width,
+    options?.height,
+    resolvedMsaaSamples,
+  ].join("|")
+}
+
+function resolveCompiledMsaaSamples(
+  compiled: CompiledSVG,
+  options: SVGPluginOptions | undefined,
+): MsaaSamples {
+  return options?.msaaSamples ?? compiled.msaaSamples ?? 4
 }
 
 function pathOptionsStateKey(options: SVGPathOptions | undefined): string {

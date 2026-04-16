@@ -1,6 +1,7 @@
 export { type ParsedColor, parseColor } from "./color.ts"
 export {
   compileSVG,
+  type CompileSVGOptions,
   type CompiledItem,
   type CompiledPath,
   type CompiledSVG,

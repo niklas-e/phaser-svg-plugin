@@ -9,9 +9,15 @@ import {
   filterPresentationAttrs,
   parseAttributes,
 } from "./presentation-attrs.ts"
+import type { MsaaSamples } from "./render-node/types.ts"
 import { convertShape } from "./shape.ts"
 import { stripNonRenderableSections } from "./svg-structure.ts"
 import type { PathCommand, SVGStyle, ViewBox } from "./types.ts"
+
+export interface CompileSVGOptions {
+  /** Default MSAA samples to embed into compiled output. */
+  msaaSamples?: MsaaSamples | undefined
+}
 
 /** A pre-compiled SVG path: parsed commands with resolved style. */
 export interface CompiledPath {
@@ -27,6 +33,8 @@ export type CompiledItem =
 /** Pre-compiled SVG ready for rendering without runtime parsing. */
 export interface CompiledSVG {
   viewBox: ViewBox | null
+  /** Optional compile-time default MSAA samples. */
+  msaaSamples?: MsaaSamples | undefined
   /** Ordered shape list used by the renderer. */
   items: CompiledItem[]
   /** Backward-compatible path list (all shapes converted to paths). */
@@ -40,7 +48,10 @@ export interface CompiledSVG {
  * The result can be serialised to JSON and rendered later with
  * `drawCompiledSVG()`.
  */
-export function compileSVG(svgString: string): CompiledSVG {
+export function compileSVG(
+  svgString: string,
+  options?: CompileSVGOptions | undefined,
+): CompiledSVG {
   const viewBox = extractViewBox(svgString) ?? null
   const inheritedStyleAttrs = extractSVGPresentationAttrs(svgString)
   const elements = extractShapeElements(stripNonRenderableSections(svgString))
@@ -71,7 +82,7 @@ export function compileSVG(svgString: string): CompiledSVG {
     }
   }
 
-  return { viewBox, items, paths }
+  return { viewBox, msaaSamples: options?.msaaSamples, items, paths }
 }
 
 /**

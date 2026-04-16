@@ -4,6 +4,20 @@ import { assertDefined } from "./assert.ts"
 import { compileSVG } from "./compiler.ts"
 
 describe("compileSVG", () => {
+  it("does not set msaaSamples when compile options are omitted", () => {
+    const svg = `<svg><path d="M 0 0 L 1 1" /></svg>`
+    const result = compileSVG(svg)
+
+    assert.equal(result.msaaSamples, undefined)
+  })
+
+  it("embeds compile-time msaaSamples default when provided", () => {
+    const svg = `<svg><path d="M 0 0 L 1 1" /></svg>`
+    const result = compileSVG(svg, { msaaSamples: 8 })
+
+    assert.equal(result.msaaSamples, 8)
+  })
+
   it("compiles a single path element", () => {
     const svg = `<svg><path d="M 0 0 L 100 100" fill="red" stroke="blue" stroke-width="2" /></svg>`
     const result = compileSVG(svg)
@@ -342,7 +356,15 @@ describe("compileSVG", () => {
     const json = JSON.stringify(compiled)
     const restored = JSON.parse(json)
 
-    assert.deepStrictEqual(restored, compiled)
+    assert.deepStrictEqual(restored.viewBox, compiled.viewBox)
+    assert.deepStrictEqual(restored.items, compiled.items)
+    assert.deepStrictEqual(restored.paths, compiled.paths)
+
+    if (compiled.msaaSamples === undefined) {
+      assert.equal("msaaSamples" in restored, false)
+    } else {
+      assert.equal(restored.msaaSamples, compiled.msaaSamples)
+    }
   })
 
   it("extracts viewBox", () => {

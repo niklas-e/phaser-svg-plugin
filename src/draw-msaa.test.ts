@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import type Phaser from "phaser"
 import type { CompiledSVG } from "./compiler.ts"
-import { drawCompiledSVG, drawSVGPath } from "./draw.ts"
+import { drawCompiledSVG, drawCompiledSVGIfDirty, drawSVGPath } from "./draw.ts"
 import type { SVGStyle } from "./types.ts"
 
 class GraphicsWithoutRenderer {
@@ -68,6 +68,38 @@ class GraphicsWithoutRenderer {
   }
 }
 
+class GraphicsWithRenderer extends GraphicsWithoutRenderer {
+  _renderSteps: ((...args: unknown[]) => void)[] = []
+
+  scene: {
+    sys: {
+      game: {
+        renderer: unknown
+      }
+    }
+  }
+
+  constructor(renderer: unknown) {
+    super()
+    this.scene = {
+      sys: {
+        game: {
+          renderer,
+        },
+      },
+    }
+  }
+
+  addRenderStep(fn: (...args: unknown[]) => void, index = 0): this {
+    this._renderSteps.splice(index, 0, fn)
+    return this
+  }
+
+  once(_event: string, _fn: (...args: unknown[]) => void): this {
+    return this
+  }
+}
+
 const DEFAULT_STYLE: SVGStyle = {
   fill: 0x000000,
   fillAlpha: 1,
@@ -81,9 +113,58 @@ const DEFAULT_STYLE: SVGStyle = {
 }
 
 function asGraphics(
-  graphics: GraphicsWithoutRenderer,
+  graphics: GraphicsWithoutRenderer | GraphicsWithRenderer,
 ): Phaser.GameObjects.Graphics {
   return graphics as unknown as Phaser.GameObjects.Graphics
+}
+
+function withFakeWebGL2Context(testFn: () => void): void {
+  const globals = globalThis as unknown as {
+    WebGL2RenderingContext?: unknown
+  }
+  const previous = globals.WebGL2RenderingContext
+
+  class FakeWebGL2Context {
+    readonly MAX_SAMPLES = 0x8d57
+
+    getParameter(param: number): number {
+      return param === this.MAX_SAMPLES ? 8 : 0
+    }
+  }
+
+  globals.WebGL2RenderingContext =
+    FakeWebGL2Context as unknown as typeof WebGL2RenderingContext
+
+  try {
+    testFn()
+  } finally {
+    if (previous === undefined) {
+      delete globals.WebGL2RenderingContext
+    } else {
+      globals.WebGL2RenderingContext = previous
+    }
+  }
+}
+
+function createRendererWithFakeWebGL2(): unknown {
+  const gl = new (
+    globalThis as unknown as {
+      WebGL2RenderingContext: new () => unknown
+    }
+  ).WebGL2RenderingContext()
+
+  return {
+    gl,
+    width: 256,
+    height: 256,
+    config: { pathDetailThreshold: 1 },
+    renderNodes: {
+      finishBatch: () => {},
+      getNode: () => ({ batch: () => {} }),
+    },
+    createTextureFromSource: () => ({ webGLTexture: null }),
+    deleteTexture: () => {},
+  }
 }
 
 describe("MSAA default x4 behavior", () => {
@@ -115,5 +196,40 @@ describe("MSAA default x4 behavior", () => {
       () => drawCompiledSVG(graphics, compiled),
       /WebGL renderer is required/,
     )
+  })
+
+  it("uses compiled default msaaSamples and allows per-draw override", () => {
+    withFakeWebGL2Context(() => {
+      const renderer = createRendererWithFakeWebGL2()
+      const graphics = asGraphics(new GraphicsWithRenderer(renderer))
+
+      const compiled: CompiledSVG = {
+        viewBox: null,
+        msaaSamples: 8,
+        items: [
+          {
+            kind: "path",
+            commands: [{ type: "M", x: 0, y: 0 }],
+            style: {
+              ...DEFAULT_STYLE,
+              fill: null,
+            },
+          },
+        ],
+        paths: [],
+      }
+
+      const first = drawCompiledSVGIfDirty(graphics, compiled)
+      const second = drawCompiledSVGIfDirty(graphics, compiled, {
+        msaaSamples: 4,
+      })
+      const third = drawCompiledSVGIfDirty(graphics, compiled, {
+        msaaSamples: 4,
+      })
+
+      assert.equal(first, true)
+      assert.equal(second, true)
+      assert.equal(third, false)
+    })
   })
 })
