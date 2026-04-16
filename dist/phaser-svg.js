@@ -531,25 +531,25 @@ function ye(e) {
 	}
 	return null;
 }
-function be(e, t, n, r) {
+function U(e, t, n, r) {
 	if (e === 8) {
-		let e = t.maxSamples >= 8, i = U(n, r, 8);
+		let e = t.maxSamples >= 8, i = W(n, r, 8);
 		if (e && i <= V) return 8;
 	}
 	if (!(t.maxSamples >= 4)) throw Error(`phaser-svg MSAA: device maximum sample count is ${t.maxSamples}, which is less than the minimum required 4. To fix: run with a WebGL2 renderer on hardware that supports at least x4 multisampling.`);
-	let i = U(n, r, 4);
+	let i = W(n, r, 4);
 	if (i > V) {
 		let e = (i / (1024 * 1024)).toFixed(0);
 		throw Error(`phaser-svg MSAA: the MSAA render target for ${n}x${r} at x4 samples would require ${e} MiB (budget is 96 MiB). To fix: lower the game canvas size, or split large SVG draws into smaller Graphics objects.`);
 	}
 	return 4;
 }
-function U(e, t, n) {
+function W(e, t, n) {
 	return e * t * 4 * n;
 }
 //#endregion
 //#region src/render-node/resources.ts
-var xe = class {
+var be = class {
 	backend;
 	msaaFBO = null;
 	_msaaFBOWrapper = null;
@@ -594,37 +594,42 @@ var xe = class {
 		let c = i(s.webGLTexture, "phaser-svg MSAA: resolved texture has no webGLTexture"), l = i(o.createFramebuffer(), "phaser-svg MSAA: failed to create MSAA framebuffer");
 		o.bindFramebuffer(o.FRAMEBUFFER, l);
 		let u = o;
-		Se(u, a, n, r), this.colorRB = u.getParameter(u.RENDERBUFFER_BINDING), this.resolveFBO = i(o.createFramebuffer(), "phaser-svg MSAA: failed to create resolve framebuffer"), o.bindFramebuffer(o.FRAMEBUFFER, this.resolveFBO), u.framebufferTexture2D(o.FRAMEBUFFER, o.COLOR_ATTACHMENT0, o.TEXTURE_2D, c, 0), o.bindFramebuffer(o.FRAMEBUFFER, null), this.msaaFBO = l, this._msaaFBOWrapper = { webGLFramebuffer: l }, this._width = n, this._height = r, this._samples = a;
+		xe(u, a, n, r), this.colorRB = u.getParameter(u.RENDERBUFFER_BINDING), this.resolveFBO = i(o.createFramebuffer(), "phaser-svg MSAA: failed to create resolve framebuffer"), o.bindFramebuffer(o.FRAMEBUFFER, this.resolveFBO), u.framebufferTexture2D(o.FRAMEBUFFER, o.COLOR_ATTACHMENT0, o.TEXTURE_2D, c, 0), o.bindFramebuffer(o.FRAMEBUFFER, null), this.msaaFBO = l, this._msaaFBOWrapper = { webGLFramebuffer: l }, this._width = n, this._height = r, this._samples = a;
 	}
 	destroyGL(e) {
 		let t = e.gl;
 		this.msaaFBO && (t.deleteFramebuffer(this.msaaFBO), this.msaaFBO = null, this._msaaFBOWrapper = null), this.resolveFBO &&= (t.deleteFramebuffer(this.resolveFBO), null), this.colorRB &&= (t.deleteRenderbuffer(this.colorRB), null), this._resolvedTexture &&= (e.deleteTexture(this._resolvedTexture), null), this._width = 0, this._height = 0, this._samples = 0;
 	}
 };
-function Se(e, t, n, r) {
+function xe(e, t, n, r) {
 	let a = i(e.createRenderbuffer(), "phaser-svg MSAA: failed to create MSAA renderbuffer");
 	e.bindRenderbuffer(e.RENDERBUFFER, a), e.renderbufferStorageMultisample(e.RENDERBUFFER, t, e.RGBA8, n, r), e.framebufferRenderbuffer(e.FRAMEBUFFER, e.COLOR_ATTACHMENT0, e.RENDERBUFFER, a);
 }
 //#endregion
 //#region src/render-node/svg-render-node.ts
-var W = /* @__PURE__ */ new WeakMap();
-function Ce(e, t, n) {
-	let r = ye(t);
-	if (!r) throw Error("phaser-svg MSAA: WebGL2 is required but not available on this renderer. Create the game with a WebGL2-backed canvas (and explicit WEBGL render type), or remove the msaaSamples option.");
-	let i = be(n, r, t.width, t.height), a = W.get(e);
-	if (a) {
-		a.samples = i;
+var G = /* @__PURE__ */ new WeakMap();
+function Se(e, t, n) {
+	let r = G.get(e);
+	if (r) {
+		(r.requestedSamples !== n || r.negotiatedWidth !== t.width || r.negotiatedHeight !== t.height) && (r.samples = U(n, r.caps, t.width, t.height), r.requestedSamples = n, r.negotiatedWidth = t.width, r.negotiatedHeight = t.height);
 		return;
 	}
-	let o = {
-		resources: new xe(r.backend),
-		caps: r,
-		samples: i,
+	let i = ye(t);
+	if (!i) throw Error("phaser-svg MSAA: WebGL2 is required but not available on this renderer. Create the game with a WebGL2-backed canvas (and explicit WEBGL render type), or remove the msaaSamples option.");
+	let a = U(n, i, t.width, t.height), o = {
+		resources: new be(i.backend),
+		caps: i,
+		samples: a,
+		requestedSamples: n,
+		negotiatedWidth: t.width,
+		negotiatedHeight: t.height,
+		quadNodeRenderer: null,
+		quadBatchNode: null,
 		detachContextLost: null
 	};
-	W.set(e, o), e.addRenderStep(we(o), 0), e.once("destroy", () => {
-		let n = W.get(e);
-		n && (n.resources.destroy(t), n.detachContextLost?.(), W.delete(e));
+	G.set(e, o), e.addRenderStep(Ce(o), 0), e.once("destroy", () => {
+		let n = G.get(e);
+		n && (n.resources.destroy(t), n.detachContextLost?.(), G.delete(e));
 	});
 	let s = t;
 	if (typeof s.on == "function") {
@@ -636,25 +641,23 @@ function Ce(e, t, n) {
 		} : null;
 	}
 }
-function we(e) {
-	return function(t, n, r) {
-		let i = t, a = n, o = r;
-		e.resources.ensureResources(i, e.caps, i.width, i.height, e.samples);
-		let s = i.renderNodes, { msaaFBOWrapper: c, resolvedTexture: l } = e.resources;
-		s.finishBatch();
-		let u = o.getClone(!1);
-		u.framebuffer = c, u.texture = l, u.state.bindings.framebuffer = c, u.beginDraw();
-		let d = i.gl;
-		d.clearColor(0, 0, 0, 0), d.clear(d.COLOR_BUFFER_BIT);
-		let f = a._renderSteps[1];
-		f && f(i, n, u), s.finishBatch(), e.resources.blitResolve(d), o.beginDraw();
-		let p = o.width, m = o.height;
-		s.getNode("BatchHandlerQuadSingle").batch(o, l, 0, 0, 0, m, p, 0, p, m, 0, 1, 1, -1, !1, 4294967295, 4294967295, 4294967295, 4294967295, {});
+function Ce(e) {
+	return function(t, n, r, i, a, o, s) {
+		let c = t, l = n, u = r;
+		e.resources.ensureResources(c, e.caps, c.width, c.height, e.samples);
+		let d = c.renderNodes, { msaaFBOWrapper: f, resolvedTexture: p } = e.resources;
+		d.finishBatch();
+		let m = u.getClone(!1);
+		m.framebuffer = f, m.texture = p, m.state.bindings.framebuffer = f, m.beginDraw();
+		let h = c.gl;
+		h.clearColor(0, 0, 0, 0), h.clear(h.COLOR_BUFFER_BIT), l.renderWebGLStep(c, n, m, i, (typeof a == "number" ? a : 0) + 1, o, s), d.finishBatch(), e.resources.blitResolve(h), u.beginDraw();
+		let g = u.width, _ = u.height;
+		(!e.quadBatchNode || e.quadNodeRenderer !== c) && (e.quadBatchNode = d.getNode("BatchHandlerQuadSingle"), e.quadNodeRenderer = c), e.quadBatchNode.batch(u, p, 0, 0, 0, _, g, 0, g, _, 0, 1, 1, -1, !1, 4294967295, 4294967295, 4294967295, 4294967295, {});
 	};
 }
 //#endregion
 //#region src/transform.ts
-function Te(e, t, n) {
+function we(e, t, n) {
 	let r = t / e.width, i = n / e.height, a = Math.min(r, i);
 	return {
 		scale: a,
@@ -662,7 +665,7 @@ function Te(e, t, n) {
 		ty: (n - e.height * a) / 2 - e.minY * a
 	};
 }
-function G(e, t, n, r) {
+function K(e, t, n, r) {
 	let i = [];
 	for (let a of e) switch (a.type) {
 		case "M":
@@ -719,7 +722,7 @@ function G(e, t, n, r) {
 }
 //#endregion
 //#region src/draw.ts
-var K = /* @__PURE__ */ new WeakMap(), q = /* @__PURE__ */ new WeakMap(), J = /* @__PURE__ */ new WeakMap(), Y = /* @__PURE__ */ new WeakMap(), Ee = 1;
+var q = /* @__PURE__ */ new WeakMap(), J = /* @__PURE__ */ new WeakMap(), Y = /* @__PURE__ */ new WeakMap(), Te = /* @__PURE__ */ new WeakMap(), Ee = 1;
 function De(e, t, n, r) {
 	ke(e, t, n, r);
 }
@@ -759,7 +762,7 @@ function Me(e, i, a) {
 		let { d: b, style: x } = y;
 		a?.overrideFill !== void 0 && (x.fill = a.overrideFill), a?.overrideStroke !== void 0 && (x.stroke = a.overrideStroke);
 		let C = t(b);
-		m && (C = c(C, m), x.strokeWidth *= d(m)), S && (C = G(C, S.scale, S.tx, S.ty), x.strokeWidth *= S.scale), F(e, C, x, a);
+		m && (C = c(C, m), x.strokeWidth *= d(m)), S && (C = K(C, S.scale, S.tx, S.ty), x.strokeWidth *= S.scale), F(e, C, x, a);
 	}
 	return Q(e, a?.msaaSamples), x(e, m), !0;
 }
@@ -797,16 +800,16 @@ function Le(e) {
 }
 function Re(e, t, n) {
 	if (t === void 0 && n === void 0) return e;
-	let r = J.get(e);
-	r || (r = /* @__PURE__ */ new Map(), J.set(e, r));
+	let r = Y.get(e);
+	r || (r = /* @__PURE__ */ new Map(), Y.set(e, r));
 	let i = `${t ?? "_"}|${n ?? "_"}`, a = r.get(i);
 	if (a) return a;
 	let o = { ...e };
 	return t !== void 0 && (o.fill = t), n !== void 0 && (o.stroke = n), r.set(i, o), o;
 }
 function ze(e, t) {
-	let r = K.get(e);
-	r || (r = /* @__PURE__ */ new Map(), K.set(e, r));
+	let r = q.get(e);
+	r || (r = /* @__PURE__ */ new Map(), q.set(e, r));
 	let i = Ve(t), a = r.get(i);
 	if (a) return a;
 	let o = e.items.map((e) => e.kind === "native" ? {
@@ -815,18 +818,18 @@ function ze(e, t) {
 		style: X(e.style, t.scale)
 	} : {
 		kind: "path",
-		commands: G(e.commands, t.scale, t.tx, t.ty),
+		commands: K(e.commands, t.scale, t.tx, t.ty),
 		style: X(e.style, t.scale)
 	});
 	return r.set(i, o), o;
 }
 function Be(e, t) {
-	let n = q.get(e);
-	n || (n = /* @__PURE__ */ new Map(), q.set(e, n));
+	let n = J.get(e);
+	n || (n = /* @__PURE__ */ new Map(), J.set(e, n));
 	let r = Ve(t), i = n.get(r);
 	if (i) return i;
 	let a = e.paths.map((e) => ({
-		commands: G(e.commands, t.scale, t.tx, t.ty),
+		commands: K(e.commands, t.scale, t.tx, t.ty),
 		style: X(e.style, t.scale)
 	}));
 	return n.set(r, a), a;
@@ -847,7 +850,7 @@ function Z(e) {
 function Q(e, t) {
 	let n = t ?? 4, r = e.scene?.sys?.game?.renderer;
 	if (!r?.gl) throw Error("phaser-svg MSAA: a WebGL renderer is required. Create the game with WebGL + WebGL2 context, or do not use this plugin in non-WebGL environments.");
-	Ce(e, r, n);
+	Se(e, r, n);
 }
 function He(e) {
 	return {
@@ -875,13 +878,13 @@ function Ue(e) {
 	};
 }
 function $(e, t) {
-	if (e && !(t?.width === void 0 && t?.height === void 0)) return Te(e, t.width ?? t.height ?? e.width, t.height ?? t.width ?? e.height);
+	if (e && !(t?.width === void 0 && t?.height === void 0)) return we(e, t.width ?? t.height ?? e.width, t.height ?? t.width ?? e.height);
 }
 function We(e) {
-	let t = Y.get(e);
+	let t = Te.get(e);
 	if (t !== void 0) return t;
 	let n = Ee;
-	return Ee += 1, Y.set(e, n), n;
+	return Ee += 1, Te.set(e, n), n;
 }
 function Ge(e) {
 	return [
