@@ -111,14 +111,15 @@ describe("negotiateSamples — x4 unavailable error message", () => {
     assert.match(msg, /2/)
   })
 
-  it("includes how-to-fix guidance about removing msaaSamples", () => {
+  it("includes WebGL2 and x4 guidance", () => {
     let msg = ""
     try {
       negotiateSamples(4, makeCaps(0), 100, 100)
     } catch (e) {
       msg = (e as Error).message
     }
-    assert.match(msg, /remove/)
+    assert.match(msg, /WebGL2/)
+    assert.match(msg, /x4/)
   })
 })
 
@@ -152,9 +153,7 @@ describe("negotiateSamples — memory budget error message", () => {
       msg = (e as Error).message
     }
     assert.ok(
-      msg.includes("lower the game canvas size") ||
-        msg.includes("msaaTargetScale") ||
-        msg.includes("split"),
+      msg.includes("lower the game canvas size") || msg.includes("split"),
     )
   })
 })

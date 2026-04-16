@@ -173,17 +173,77 @@ interface TexturePrepMetrics {
   blit: number[]
 }
 
+interface BenchmarkRendererForMsaa {
+  gl: WebGLRenderingContext
+  width: number
+  height: number
+  config: {
+    pathDetailThreshold: number
+  }
+  renderNodes: {
+    finishBatch(): void
+    getNode(name: string): { batch(...args: unknown[]): void }
+  }
+  createTextureFromSource(
+    source: null,
+    width: number,
+    height: number,
+    scaleMode: number,
+  ): { webGLTexture: WebGLTexture | null } | null
+  deleteTexture(texture: { webGLTexture: WebGLTexture | null }): void
+}
+
+let benchmarkRendererForMsaa: BenchmarkRendererForMsaa | null = null
+
+function getBenchmarkRendererForMsaa(): BenchmarkRendererForMsaa {
+  if (benchmarkRendererForMsaa) {
+    return benchmarkRendererForMsaa
+  }
+
+  const canvas = document.createElement("canvas")
+  const gl2 = assertDefined(
+    canvas.getContext("webgl2") as WebGL2RenderingContext | null,
+    "Benchmark runner requires WebGL2 for default x4 MSAA",
+  )
+
+  benchmarkRendererForMsaa = {
+    gl: gl2 as unknown as WebGLRenderingContext,
+    width: 1,
+    height: 1,
+    config: {
+      pathDetailThreshold: 1,
+    },
+    renderNodes: {
+      finishBatch: () => {},
+      getNode: () => ({
+        batch: () => {},
+      }),
+    },
+    createTextureFromSource: () => ({ webGLTexture: null }),
+    deleteTexture: () => {},
+  }
+
+  return benchmarkRendererForMsaa
+}
+
 class NoopGraphics {
+  _renderSteps: ((...args: unknown[]) => void)[] = []
+
   scene = {
     sys: {
       game: {
-        renderer: {
-          config: {
-            pathDetailThreshold: 1,
-          },
-        },
+        renderer: getBenchmarkRendererForMsaa(),
       },
     },
+  }
+
+  addRenderStep(fn: (...args: unknown[]) => void, index = 0): this {
+    this._renderSteps.splice(index, 0, fn)
+    return this
+  }
+
+  once(_event: string, _fn: (...args: unknown[]) => void): this {
+    return this
   }
 
   clear(): this {
