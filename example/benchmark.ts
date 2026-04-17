@@ -7,6 +7,7 @@ import {
   drawSVG,
   drawSVGIfDirty,
   markSVGDirty,
+  SVGSceneBatch,
 } from "../src/index.ts"
 
 export interface BenchmarkFixture {
@@ -98,6 +99,8 @@ interface PluginPerfFixtureResult {
   compiledSkip: DistributionStats
   runtimeDirtyRedraw: DistributionStats
   compiledDirtyRedraw: DistributionStats
+  immediateCompiled64: DistributionStats
+  sceneBatchCompiled64: DistributionStats
 }
 
 interface TexturePerfFixtureResult {
@@ -134,6 +137,8 @@ interface BenchmarkResult {
         compiledSkipMedianMs: number
         runtimeDirtyRedrawMedianMs: number
         compiledDirtyRedrawMedianMs: number
+        immediateCompiled64MedianMs: number
+        sceneBatchCompiled64MedianMs: number
       }
     }
     texturePrep: {
@@ -166,6 +171,8 @@ interface PluginPerfMetrics {
   compiledSkip: number[]
   runtimeDirtyRedraw: number[]
   compiledDirtyRedraw: number[]
+  immediateCompiled64: number[]
+  sceneBatchCompiled64: number[]
 }
 
 interface TexturePrepMetrics {
@@ -306,6 +313,29 @@ class NoopGraphics {
   ): this {
     return this
   }
+}
+
+class NoopEvents {
+  on(_event: string, _fn: () => void): void {}
+  off(_event: string, _fn: () => void): void {}
+  once(_event: string, _fn: () => void): void {}
+}
+
+function createNoopBatchScene(
+  renderer: BenchmarkRendererForMsaa,
+  graphics: Phaser.GameObjects.Graphics,
+): Phaser.Scene {
+  return {
+    sys: {
+      game: {
+        renderer,
+      },
+      events: new NoopEvents(),
+    },
+    add: {
+      graphics: () => graphics,
+    },
+  } as unknown as Phaser.Scene
 }
 
 function assertDefined<T>(value: T | null | undefined, message: string): T {
@@ -1413,6 +1443,40 @@ function runPluginPerfFixture(
     drawCompiledSVGIfDirty(graphics, compiled, options)
   })
 
+  const objectCount = 64
+  const immediateGraphics = Array.from(
+    { length: objectCount },
+    () => new NoopGraphics() as unknown as Phaser.GameObjects.Graphics,
+  )
+
+  const immediateCompiled64 = measureBatchedSeries(iterations, 1, () => {
+    for (const objectGraphics of immediateGraphics) {
+      markSVGDirty(objectGraphics)
+      drawCompiledSVG(objectGraphics, compiled, options)
+    }
+  })
+
+  const batchGraphics =
+    new NoopGraphics() as unknown as Phaser.GameObjects.Graphics
+  const batchScene = createNoopBatchScene(getBenchmarkRendererForMsaa(), batchGraphics)
+  const sceneBatch = new SVGSceneBatch(batchScene, {
+    graphics: batchGraphics,
+    autoFlush: false,
+  })
+
+  const sceneBatchCompiled64 = measureBatchedSeries(iterations, 1, () => {
+    for (let i = 0; i < objectCount; i++) {
+      const tx = (i % 8) * (fixture.width + 2)
+      const ty = Math.floor(i / 8) * (fixture.height + 2)
+      sceneBatch.queueCompiled(compiled, {
+        ...options,
+        x: tx,
+        y: ty,
+      })
+    }
+    sceneBatch.flush()
+  })
+
   return {
     runtimeDraw,
     compiledDraw,
@@ -1420,6 +1484,8 @@ function runPluginPerfFixture(
     compiledSkip,
     runtimeDirtyRedraw,
     compiledDirtyRedraw,
+    immediateCompiled64,
+    sceneBatchCompiled64,
   }
 }
 
@@ -1437,6 +1503,8 @@ async function runPluginPerfBench(
     compiledSkipMedianMs: number
     runtimeDirtyRedrawMedianMs: number
     compiledDirtyRedrawMedianMs: number
+    immediateCompiled64MedianMs: number
+    sceneBatchCompiled64MedianMs: number
   }
 }> {
   const results: PluginPerfFixtureResult[] = []
@@ -1455,6 +1523,8 @@ async function runPluginPerfBench(
       compiledSkip: summarizeSamples(metrics.compiledSkip),
       runtimeDirtyRedraw: summarizeSamples(metrics.runtimeDirtyRedraw),
       compiledDirtyRedraw: summarizeSamples(metrics.compiledDirtyRedraw),
+      immediateCompiled64: summarizeSamples(metrics.immediateCompiled64),
+      sceneBatchCompiled64: summarizeSamples(metrics.sceneBatchCompiled64),
     })
 
     await nextFrame()
@@ -1480,6 +1550,12 @@ async function runPluginPerfBench(
       ),
       compiledDirtyRedrawMedianMs: mean(
         results.map((entry) => entry.compiledDirtyRedraw.medianMs),
+      ),
+      immediateCompiled64MedianMs: mean(
+        results.map((entry) => entry.immediateCompiled64.medianMs),
+      ),
+      sceneBatchCompiled64MedianMs: mean(
+        results.map((entry) => entry.sceneBatchCompiled64.medianMs),
       ),
     },
   }
@@ -1623,6 +1699,14 @@ async function runBenchmark(
         scenario: "dirty redraw clear+draw",
         medianMs: pluginPerf.summary.runtimeDirtyRedrawMedianMs,
       },
+      {
+        scenario: "multi-object immediate compiled (64)",
+        medianMs: pluginPerf.summary.immediateCompiled64MedianMs,
+      },
+      {
+        scenario: "multi-object scene batch compiled (64)",
+        medianMs: pluginPerf.summary.sceneBatchCompiled64MedianMs,
+      },
     ],
   }
 
@@ -1663,6 +1747,12 @@ function buildCompactSummary(result: BenchmarkResult): string {
   )
   lines.push(
     `Plugin CPU unchanged skip median ms: ${perf.pluginCpu.summary.runtimeSkipMedianMs.toFixed(5)}`,
+  )
+  lines.push(
+    `Plugin CPU multi-object immediate compiled (64) median ms: ${perf.pluginCpu.summary.immediateCompiled64MedianMs.toFixed(3)}`,
+  )
+  lines.push(
+    `Plugin CPU multi-object scene batch compiled (64) median ms: ${perf.pluginCpu.summary.sceneBatchCompiled64MedianMs.toFixed(3)}`,
   )
   lines.push(
     `Texture prep decode median ms: ${perf.texturePrep.summary.decodeMedianMs.toFixed(3)}`,
