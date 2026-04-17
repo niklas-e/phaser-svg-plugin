@@ -13,6 +13,11 @@ import {
   markSVGDirty,
   type SVGPluginOptions,
 } from "./draw.ts"
+import {
+  SVGSceneBatch,
+  type SceneBatchDrawOptions,
+  type SceneBatchPathOptions,
+} from "./scene-batch.ts"
 import type { SVGStyle } from "./types.ts"
 
 export {
@@ -24,6 +29,9 @@ export {
   drawSVGPath,
   drawSVGPathIfDirty,
   markSVGDirty,
+  SVGSceneBatch,
+  type SceneBatchDrawOptions,
+  type SceneBatchPathOptions,
   type SVGPathOptions,
   type SVGPluginOptions,
 }
@@ -52,6 +60,7 @@ export {
  */
 export class SVGPlugin extends Plugins.ScenePlugin {
   private defaultOptions: SVGPluginOptions = { msaaSamples: 4 }
+  private sceneBatch: SVGSceneBatch | null = null
 
   boot(): void {
     const events = assertDefined(
@@ -155,7 +164,69 @@ export class SVGPlugin extends Plugins.ScenePlugin {
     return this
   }
 
+  /** Queue an SVG string into the scene batcher for end-of-frame rendering. */
+  queue(
+    svgString: string,
+    options?: SceneBatchDrawOptions | undefined,
+  ): this {
+    this.ensureSceneBatch().queueSVG(svgString, {
+      ...this.defaultOptions,
+      ...options,
+    })
+    return this
+  }
+
+  /** Queue a pre-compiled SVG into the scene batcher for end-of-frame rendering. */
+  queueCompiled(
+    compiled: CompiledSVG,
+    options?: SceneBatchDrawOptions | undefined,
+  ): this {
+    this.ensureSceneBatch().queueCompiled(compiled, {
+      ...this.defaultOptions,
+      ...options,
+    })
+    return this
+  }
+
+  /** Queue a path `d` command list into the scene batcher for end-of-frame rendering. */
+  queuePath(
+    d: string,
+    style?: Partial<SVGStyle> | undefined,
+    options?: SceneBatchPathOptions | undefined,
+  ): this {
+    const pathDefaults: SceneBatchPathOptions = {
+      curveResolution: this.defaultOptions.curveResolution,
+      msaaSamples: this.defaultOptions.msaaSamples,
+    }
+
+    this.ensureSceneBatch().queuePath(d, style, {
+      ...pathDefaults,
+      ...options,
+    })
+    return this
+  }
+
+  /** Flush queued scene batch work immediately. */
+  flushQueue(): boolean {
+    return this.ensureSceneBatch().flush()
+  }
+
+  /** Access the underlying scene batch queue instance. */
+  getSceneBatch(): SVGSceneBatch {
+    return this.ensureSceneBatch()
+  }
+
+  private ensureSceneBatch(): SVGSceneBatch {
+    if (!this.sceneBatch) {
+      this.sceneBatch = new SVGSceneBatch(assertDefined(this.scene))
+    }
+
+    return this.sceneBatch
+  }
+
   destroy(): void {
+    this.sceneBatch?.destroy()
+    this.sceneBatch = null
     super.destroy()
   }
 }
