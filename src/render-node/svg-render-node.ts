@@ -200,12 +200,30 @@ function buildRenderStepFn(state: MsaaStepState): (...args: unknown[]) => void {
     const g = gameObject as PhaserGraphics
     const ctx = drawingContext as PhaserDrawingContext
 
-    // Ensure MSAA GPU resources exist at the current renderer size and sample count.
+    const targetSize = resolveTargetSize(ctx, r)
+    const targetWidth = targetSize.width
+    const targetHeight = targetSize.height
+
+    if (
+      state.negotiatedWidth !== targetWidth ||
+      state.negotiatedHeight !== targetHeight
+    ) {
+      state.samples = negotiateSamples(
+        state.requestedSamples,
+        state.caps,
+        targetWidth,
+        targetHeight,
+      )
+      state.negotiatedWidth = targetWidth
+      state.negotiatedHeight = targetHeight
+    }
+
+    // Ensure MSAA GPU resources exist at the active drawing target size and sample count.
     state.resources.ensureResources(
       r as unknown as Parameters<MsaaResources["ensureResources"]>[0],
       state.caps,
-      r.width,
-      r.height,
+      targetWidth,
+      targetHeight,
       state.samples,
     )
 
@@ -290,4 +308,23 @@ function buildRenderStepFn(state: MsaaStepState): (...args: unknown[]) => void {
       {},
     )
   }
+}
+
+function resolveTargetSize(
+  context: PhaserDrawingContext,
+  renderer: PhaserRendererForStep,
+): { width: number; height: number } {
+  const contextWidth = context.width
+  const contextHeight = context.height
+
+  const width =
+    Number.isFinite(contextWidth) && contextWidth > 0
+      ? contextWidth
+      : renderer.width
+  const height =
+    Number.isFinite(contextHeight) && contextHeight > 0
+      ? contextHeight
+      : renderer.height
+
+  return { width, height }
 }

@@ -113,19 +113,39 @@ function withFakeWebGL2Context(testFn: () => void): void {
   }
 }
 
-function createScene(graphics: FakeGraphics): Phaser.Scene {
+function createScene(
+  graphics: FakeGraphics,
+  options?: { withConfig?: boolean },
+): Phaser.Scene {
   const events = new FakeEvents()
-  const renderer = {
+  const renderer: {
+    gl: WebGLRenderingContext
+    width: number
+    height: number
+    config?: { pathDetailThreshold: number } | undefined
+    pathDetailThreshold?: number | undefined
+    renderNodes: {
+      finishBatch: () => void
+      getNode: () => { batch: () => void }
+    }
+    createTextureFromSource: () => { webGLTexture: WebGLTexture }
+    deleteTexture: () => void
+  } = {
     gl: new FakeWebGL2Context() as unknown as WebGLRenderingContext,
     width: 320,
     height: 180,
-    config: { pathDetailThreshold: 1 },
     renderNodes: {
       finishBatch: () => {},
       getNode: () => ({ batch: () => {} }),
     },
     createTextureFromSource: () => ({ webGLTexture: {} as WebGLTexture }),
     deleteTexture: () => {},
+  }
+
+  if (options?.withConfig === false) {
+    renderer.pathDetailThreshold = 1
+  } else {
+    renderer.config = { pathDetailThreshold: 1 }
   }
 
   return {
@@ -152,10 +172,14 @@ describe("SVGSceneBatch", () => {
       })
 
       batch.queuePath("M 0 0 L 20 0 L 20 20 L 0 20 Z", { fill: 0xffffff })
-      batch.queuePath("M 0 0 L 10 0 L 10 10 L 0 10 Z", { fill: 0xff0000 }, {
-        x: 40,
-        y: 0,
-      })
+      batch.queuePath(
+        "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+        { fill: 0xff0000 },
+        {
+          x: 40,
+          y: 0,
+        },
+      )
 
       const flushed = batch.flush()
       assert.equal(flushed, true)
@@ -186,6 +210,27 @@ describe("SVGSceneBatch", () => {
       assert.equal(graphics.clearCalls, 1)
       assert.ok(graphics.fillTriangleCalls > 0)
       assert.ok(graphics.minTriangleX >= 8)
+    })
+  })
+
+  it("disables simplification when threshold lives on renderer root", () => {
+    withFakeWebGL2Context(() => {
+      const graphics = new FakeGraphics()
+      const scene = createScene(graphics, { withConfig: false })
+      const batch = new SVGSceneBatch(scene, {
+        graphics: graphics as unknown as Phaser.GameObjects.Graphics,
+        autoFlush: false,
+      })
+
+      batch.queuePath("M 0 0 L 10 0 L 10 10 Z", { fill: 0x00ff00 })
+      batch.flush()
+
+      const renderer = (
+        scene as unknown as {
+          sys: { game: { renderer: { pathDetailThreshold?: number } } }
+        }
+      ).sys.game.renderer
+      assert.equal(renderer.pathDetailThreshold, 0)
     })
   })
 })

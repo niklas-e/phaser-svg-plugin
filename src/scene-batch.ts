@@ -1,5 +1,5 @@
 import type { GameObjects } from "phaser"
-import type { CompiledItem, CompiledSVG } from "./compiler.ts"
+import type { CompiledSVG } from "./compiler.ts"
 import { compileSVG } from "./compiler.ts"
 import { drawNativeShape, transformNativeShape } from "./native-shape.ts"
 import { parsePath } from "./path-parser.ts"
@@ -48,6 +48,7 @@ interface SceneLike {
         gl?: WebGLRenderingContext | null
         width: number
         height: number
+        pathDetailThreshold?: number | undefined
         config?: { pathDetailThreshold?: number | undefined } | undefined
         renderNodes: {
           finishBatch(): void
@@ -109,7 +110,10 @@ export class SVGSceneBatch {
     return this
   }
 
-  queueSVG(svgString: string, options?: SceneBatchDrawOptions | undefined): this {
+  queueSVG(
+    svgString: string,
+    options?: SceneBatchDrawOptions | undefined,
+  ): this {
     return this.queueCompiled(compileSVG(svgString), options)
   }
 
@@ -135,7 +139,10 @@ export class SVGSceneBatch {
     this.graphics.clear()
 
     const renderer = this.scene.sys.game.renderer
-    applyCrispPathDetailThreshold(renderer.config)
+    const changedConfig = applyCrispPathDetailThreshold(renderer.config)
+    if (!changedConfig) {
+      applyCrispPathDetailThreshold(renderer)
+    }
 
     let requestedSamples: MsaaSamples = 4
 
@@ -161,7 +168,8 @@ export class SVGSceneBatch {
       const scale = transform?.scale ?? 1
 
       const hasOverrides =
-        options?.overrideFill !== undefined || options?.overrideStroke !== undefined
+        options?.overrideFill !== undefined ||
+        options?.overrideStroke !== undefined
 
       for (const item of entry.compiled.items) {
         const baseStyle =
@@ -274,9 +282,15 @@ function applyStyleOverrides(
 
 function computeTransform(
   viewBox: ViewBox | null,
-  options: { width?: number | undefined; height?: number | undefined } | undefined,
+  options:
+    | { width?: number | undefined; height?: number | undefined }
+    | undefined,
 ): { scale: number; tx: number; ty: number } | undefined {
-  if (!viewBox || options?.width === undefined || options?.height === undefined) {
+  if (
+    !viewBox ||
+    options?.width === undefined ||
+    options?.height === undefined
+  ) {
     return undefined
   }
 

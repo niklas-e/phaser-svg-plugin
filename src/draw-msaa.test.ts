@@ -146,18 +146,31 @@ function withFakeWebGL2Context(testFn: () => void): void {
   }
 }
 
-function createRendererWithFakeWebGL2(): unknown {
+function createRendererWithFakeWebGL2(options?: {
+  withConfig?: boolean
+}): unknown {
   const gl = new (
     globalThis as unknown as {
       WebGL2RenderingContext: new () => unknown
     }
   ).WebGL2RenderingContext()
 
-  return {
+  const renderer: {
+    gl: unknown
+    width: number
+    height: number
+    config?: { pathDetailThreshold: number } | undefined
+    pathDetailThreshold?: number | undefined
+    renderNodes: {
+      finishBatch: () => void
+      getNode: () => { batch: () => void }
+    }
+    createTextureFromSource: () => { webGLTexture: null }
+    deleteTexture: () => void
+  } = {
     gl,
     width: 256,
     height: 256,
-    config: { pathDetailThreshold: 1 },
     renderNodes: {
       finishBatch: () => {},
       getNode: () => ({ batch: () => {} }),
@@ -165,6 +178,14 @@ function createRendererWithFakeWebGL2(): unknown {
     createTextureFromSource: () => ({ webGLTexture: null }),
     deleteTexture: () => {},
   }
+
+  if (options?.withConfig === false) {
+    renderer.pathDetailThreshold = 1
+  } else {
+    renderer.config = { pathDetailThreshold: 1 }
+  }
+
+  return renderer
 }
 
 describe("MSAA default x4 behavior", () => {
@@ -228,6 +249,19 @@ describe("MSAA default x4 behavior", () => {
       assert.equal(first, true)
       assert.equal(second, true)
       assert.equal(third, false)
+    })
+  })
+
+  it("disables simplification when renderer exposes top-level threshold", () => {
+    withFakeWebGL2Context(() => {
+      const renderer = createRendererWithFakeWebGL2({ withConfig: false }) as {
+        pathDetailThreshold?: number
+      }
+      const graphics = asGraphics(new GraphicsWithRenderer(renderer))
+
+      drawSVGPath(graphics, "M 0 0 L 10 0 L 10 10 Z")
+
+      assert.equal(renderer.pathDetailThreshold, 0)
     })
   })
 })

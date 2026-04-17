@@ -416,6 +416,50 @@ describe("attachMsaaRenderStep render-step forwarding", () => {
     })
   })
 
+  it("renegotiates samples when drawing-context size changes", () => {
+    withFakeWebGL2Context(() => {
+      const gl = new FakeWebGL2Context()
+      const renderer = createRenderer(gl)
+      const graphics = new FakeGraphics()
+
+      renderer.width = 1600
+      renderer.height = 1200
+
+      attachMsaaRenderStep(
+        graphics as unknown as Phaser.GameObjects.Graphics,
+        renderer as unknown as Parameters<typeof attachMsaaRenderStep>[1],
+        8,
+      )
+
+      const step = graphics._renderSteps[0]
+      assert.ok(step)
+
+      step(
+        renderer,
+        graphics,
+        new FakeDrawingContext(1600, 1200),
+        undefined,
+        0,
+        undefined,
+        undefined,
+      )
+
+      // Keep renderer size stable, but switch to a larger drawing target.
+      // x8 exceeds memory budget for 2200x1600 so this should negotiate down to x4.
+      step(
+        renderer,
+        graphics,
+        new FakeDrawingContext(2200, 1600),
+        undefined,
+        0,
+        undefined,
+        undefined,
+      )
+
+      assert.deepEqual(gl.multisampleAllocations, [8, 4])
+    })
+  })
+
   it("caches BatchHandlerQuadSingle node lookup per renderer", () => {
     withFakeWebGL2Context(() => {
       const gl = new FakeWebGL2Context()

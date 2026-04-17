@@ -284,7 +284,9 @@ function drawCompiledSVGInternal(
     overrideFill !== undefined || overrideStroke !== undefined
 
   const items = compiled.items
-  const sourceItems = transform ? getTransformedItems(compiled, transform) : items
+  const sourceItems = transform
+    ? getTransformedItems(compiled, transform)
+    : items
 
   for (const item of sourceItems) {
     const style = hasOverrides
@@ -420,6 +422,7 @@ function transformKey(transform: {
 
 interface PhaserRendererLike {
   config?: { pathDetailThreshold?: number | undefined } | undefined
+  pathDetailThreshold?: number | undefined
 }
 
 interface PhaserRendererForMsaa {
@@ -443,7 +446,10 @@ function applyGraphicsCrispDefaults(graphics: GameObjects.Graphics): void {
   const renderer = graphics.scene?.sys?.game?.renderer as
     | PhaserRendererLike
     | undefined
-  applyCrispPathDetailThreshold(renderer?.config)
+  const changedConfig = applyCrispPathDetailThreshold(renderer?.config)
+  if (!changedConfig) {
+    applyCrispPathDetailThreshold(renderer)
+  }
 }
 
 /**
