@@ -1,4 +1,5 @@
 import type { GameObjects } from "phaser"
+import earcut from "earcut"
 import { assertDefined } from "./assert.ts"
 import { computeSquareCap } from "./line-cap.ts"
 import {
@@ -34,11 +35,8 @@ const TESSELLATED_SUBPATH_CACHE = new WeakMap<
   Map<number, ReadonlyArray<TessellatedSubpath>>
 >()
 type CompoundFillGroup = {
-  ring: ReadonlyArray<{ x: number; y: number }>
-  bridges?: ReadonlyArray<{
-    a: { x: number; y: number }
-    b: { x: number; y: number }
-  }>
+  points: ReadonlyArray<{ x: number; y: number }>
+  indices: ReadonlyArray<number>
 }
 const COMPOUND_FILL_CACHE = new WeakMap<
   ReadonlyArray<{
@@ -437,16 +435,10 @@ function tessellateArc(
 }
 
 /**
- * Fill compound paths (with holes) by constructing bridged polygons.
+ * Fill compound paths (with holes) using explicit triangulation.
  *
- * Phaser's WebGL FillPath renders each subpath independently through
- * earcut without hole support. To produce correct fills for paths with
- * holes we merge each outer ring with its holes into a single simple
- * polygon by inserting bridge edges. The result is a single ring that
- * Phaser can fill natively, eliminating triangulation seams entirely.
- *
- * A 1px stroke patch is drawn over each bridge slit to cover hairline
- * rasterization cracks.
+ * We triangulate each outer+holes group once and submit triangles directly
+ * through Graphics.fillTriangle so Phaser batches flat geometry in TriFlat.
  */
 function fillCompoundPath(
   graphics: GameObjects.Graphics,
@@ -463,30 +455,14 @@ function fillCompoundPath(
   graphics.fillStyle(assertDefined(style.fill), fillAlpha)
 
   for (const group of groups) {
-    graphics.beginPath()
-    const start = assertDefined(group.ring[0])
-    graphics.moveTo(start.x, start.y)
-    for (let j = 1; j < group.ring.length; j++) {
-      const pt = assertDefined(group.ring[j])
-      graphics.lineTo(pt.x, pt.y)
-    }
-    graphics.closePath()
-    graphics.fillPath()
-
-    if (!group.bridges || group.bridges.length === 0) {
-      continue
-    }
-
-    // Patch hairline cracks along bridge slits by stroking a 1px line
-    // over each bridge edge. Unlike filled quads, strokes render with
-    // consistent sub-pixel coverage at every zoom level.
-    const fillColor = assertDefined(style.fill)
-    graphics.lineStyle(1, fillColor, fillAlpha)
-    for (const bridge of group.bridges) {
-      graphics.beginPath()
-      graphics.moveTo(bridge.a.x, bridge.a.y)
-      graphics.lineTo(bridge.b.x, bridge.b.y)
-      graphics.strokePath()
+    for (let i = 0; i + 2 < group.indices.length; i += 3) {
+      const ia = assertDefined(group.indices[i])
+      const ib = assertDefined(group.indices[i + 1])
+      const ic = assertDefined(group.indices[i + 2])
+      const a = assertDefined(group.points[ia])
+      const b = assertDefined(group.points[ib])
+      const c = assertDefined(group.points[ic])
+      graphics.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y)
     }
   }
 }
@@ -509,20 +485,57 @@ function getCompoundFillGroups(
   }
 
   const grouped = groupSubpathsForFill(closed)
-  const prepared: CompoundFillGroup[] = grouped.map((group) => {
-    if (group.holes.length === 0) {
-      return { ring: group.outer }
-    }
+  const prepared: CompoundFillGroup[] = []
 
-    const bridged = buildBridgedPolygon(group.outer, group.holes)
-    return {
-      ring: bridged.ring,
-      bridges: bridged.bridges,
+  for (const group of grouped) {
+    const triangulated = triangulateFillGroup(group)
+    if (triangulated) {
+      prepared.push(triangulated)
     }
-  })
+  }
 
   COMPOUND_FILL_CACHE.set(subpaths, prepared)
   return prepared
+}
+
+function triangulateFillGroup(group: FillGroup): CompoundFillGroup | null {
+  if (group.outer.length < 3) {
+    return null
+  }
+
+  const vertices: number[] = []
+  const holeIndices: number[] = []
+
+  const appendRing = (ring: ReadonlyArray<{ x: number; y: number }>) => {
+    for (const point of ring) {
+      vertices.push(point.x, point.y)
+    }
+  }
+
+  appendRing(group.outer)
+
+  for (const hole of group.holes) {
+    if (hole.length < 3) {
+      continue
+    }
+    holeIndices.push(vertices.length / 2)
+    appendRing(hole)
+  }
+
+  const indices = earcut(vertices, holeIndices, 2)
+  if (indices.length === 0) {
+    return null
+  }
+
+  const points: Array<{ x: number; y: number }> = []
+  for (let i = 0; i < vertices.length; i += 2) {
+    points.push({
+      x: assertDefined(vertices[i]),
+      y: assertDefined(vertices[i + 1]),
+    })
+  }
+
+  return { points, indices }
 }
 
 interface BridgeEdge {
