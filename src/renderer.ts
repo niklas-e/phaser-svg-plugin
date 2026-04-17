@@ -143,20 +143,10 @@ function renderSimplePath(
   // Stroke each subpath
   if (canStroke) {
     const strokeColor = assertDefined(style.stroke)
-    graphics.lineStyle(style.strokeWidth, strokeColor, strokeAlpha)
+    graphics.fillStyle(strokeColor, strokeAlpha)
 
     for (const { points, closed } of tessellated) {
-      graphics.beginPath()
-      const start = assertDefined(points[0])
-      graphics.moveTo(start.x, start.y)
-      for (let j = 1; j < points.length; j++) {
-        const pt = assertDefined(points[j])
-        graphics.lineTo(pt.x, pt.y)
-      }
-      if (closed) {
-        graphics.closePath()
-      }
-      graphics.strokePath()
+      strokeWithTriangles(graphics, points, closed, style.strokeWidth / 2)
     }
   }
 
@@ -196,20 +186,10 @@ function renderComplexPath(
   // Stroke: draw each subpath outline individually
   if (canStroke) {
     const strokeColor = assertDefined(style.stroke)
-    graphics.lineStyle(style.strokeWidth, strokeColor, strokeAlpha)
+    graphics.fillStyle(strokeColor, strokeAlpha)
 
     for (const { points, closed } of tessellated) {
-      graphics.beginPath()
-      const start = assertDefined(points[0])
-      graphics.moveTo(start.x, start.y)
-      for (let j = 1; j < points.length; j++) {
-        const pt = assertDefined(points[j])
-        graphics.lineTo(pt.x, pt.y)
-      }
-      if (closed) {
-        graphics.closePath()
-      }
-      graphics.strokePath()
+      strokeWithTriangles(graphics, points, closed, style.strokeWidth / 2)
     }
   }
 
@@ -1043,21 +1023,78 @@ function lineJoinDecorationKey(closed: boolean, style: SVGStyle): string {
   ].join("|")
 }
 
+function strokeWithTriangles(
+  graphics: GameObjects.Graphics,
+  points: ReadonlyArray<Point2D>,
+  closed: boolean,
+  halfWidth: number,
+): void {
+  const n = points.length
+  if (n < 2) {
+    return
+  }
+
+  const segmentCount = closed ? n : n - 1
+
+  for (let i = 0; i < segmentCount; i++) {
+    const a = assertDefined(points[i])
+    const b = assertDefined(points[(i + 1) % n])
+    const quad = computeStrokeQuad(a, b, halfWidth)
+    if (!quad) {
+      continue
+    }
+
+    fillQuad(graphics, quad)
+  }
+}
+
+function computeStrokeQuad(
+  a: Point2D,
+  b: Point2D,
+  halfWidth: number,
+): [Point2D, Point2D, Point2D, Point2D] | null {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const len = Math.hypot(dx, dy)
+  if (len === 0) {
+    return null
+  }
+
+  const nx = (-dy / len) * halfWidth
+  const ny = (dx / len) * halfWidth
+
+  return [
+    { x: a.x + nx, y: a.y + ny },
+    { x: a.x - nx, y: a.y - ny },
+    { x: b.x - nx, y: b.y - ny },
+    { x: b.x + nx, y: b.y + ny },
+  ]
+}
+
+function fillQuad(
+  graphics: GameObjects.Graphics,
+  [a, b, c, d]: [Point2D, Point2D, Point2D, Point2D],
+): void {
+  graphics.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y)
+  graphics.fillTriangle(a.x, a.y, c.x, c.y, d.x, d.y)
+}
+
 function fillPolygon(
   graphics: GameObjects.Graphics,
   points: ReadonlyArray<Point2D>,
 ): void {
   if (points.length < 3) return
 
-  graphics.beginPath()
-  const start = assertDefined(points[0])
-  graphics.moveTo(start.x, start.y)
-
-  for (let i = 1; i < points.length; i++) {
-    const point = assertDefined(points[i])
-    graphics.lineTo(point.x, point.y)
+  const vertices: number[] = []
+  for (const point of points) {
+    vertices.push(point.x, point.y)
   }
 
-  graphics.closePath()
-  graphics.fillPath()
+  const indices = earcut(vertices, [], 2)
+  for (let i = 0; i + 2 < indices.length; i += 3) {
+    const a = assertDefined(points[assertDefined(indices[i])])
+    const b = assertDefined(points[assertDefined(indices[i + 1])])
+    const c = assertDefined(points[assertDefined(indices[i + 2])])
+    graphics.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y)
+  }
 }
