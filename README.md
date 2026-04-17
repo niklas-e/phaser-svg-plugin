@@ -228,7 +228,7 @@ Set default options for all draw calls in a scene:
 ```ts
 this.svg.setDefaults({
   overrideFill: 0x00ff00,
-  curveResolution: 64,
+  curveTolerance: 0.2,
 })
 ```
 
@@ -268,7 +268,8 @@ this.svg.setDefaults({
 
 | Property | Type | Description |
 | --- | --- | --- |
-| `curveResolution` | `number` | Points per curve for tessellation (default `32`) |
+| `curveTolerance` | `number` | Maximum screen-space curve flattening error. Default is `0.25` for quality-first adaptive tessellation. |
+| `curveResolution` | `number` | Optional fixed points-per-curve override when you need deterministic legacy tessellation. |
 | `overrideFill` | `number` | Force fill colour for all shapes |
 | `overrideStroke` | `number` | Force stroke colour for all shapes |
 | `msaaSamples` | `4 \| 8` | MSAA sample count. Default is `4` (quality-first). `8` downgrades to `4` when unsupported. |

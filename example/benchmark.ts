@@ -1398,10 +1398,19 @@ function runPluginPerfFixture(
   drawSVG(graphics, fixture.svg, options)
   drawCompiledSVG(graphics, compiled, options)
   clearSVGDirtyState(graphics)
+  const runtimeFirstDrawSources = Array.from(
+    { length: iterations },
+    (_, index) => withBenchmarkCacheBuster(fixture.svg, index),
+  )
+  let runtimeFirstDrawIndex = 0
 
   const runtimeDraw = measureBatchedSeries(iterations, 1, () => {
     markSVGDirty(graphics)
-    drawSVG(graphics, fixture.svg, options)
+    drawSVG(
+      graphics,
+      runtimeFirstDrawSources[runtimeFirstDrawIndex++] ?? fixture.svg,
+      options,
+    )
   })
 
   clearSVGDirtyState(graphics)
@@ -1458,7 +1467,10 @@ function runPluginPerfFixture(
 
   const batchGraphics =
     new NoopGraphics() as unknown as Phaser.GameObjects.Graphics
-  const batchScene = createNoopBatchScene(getBenchmarkRendererForMsaa(), batchGraphics)
+  const batchScene = createNoopBatchScene(
+    getBenchmarkRendererForMsaa(),
+    batchGraphics,
+  )
   const sceneBatch = new SVGSceneBatch(batchScene, {
     graphics: batchGraphics,
     autoFlush: false,
@@ -1487,6 +1499,15 @@ function runPluginPerfFixture(
     immediateCompiled64,
     sceneBatchCompiled64,
   }
+}
+
+function withBenchmarkCacheBuster(svgString: string, index: number): string {
+  const marker = `<!--benchmark-cache-buster:${index}-->`
+  if (svgString.includes("</svg>")) {
+    return svgString.replace(/<\/svg>/i, `${marker}</svg>`)
+  }
+
+  return `${svgString}${marker}`
 }
 
 async function runPluginPerfBench(
