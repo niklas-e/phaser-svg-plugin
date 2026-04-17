@@ -5,11 +5,6 @@ export interface CompileSVGOptions {
     /** Default MSAA samples to embed into compiled output. */
     msaaSamples?: MsaaSamples | undefined;
 }
-/** A pre-compiled SVG path: parsed commands with resolved style. */
-export interface CompiledPath {
-    commands: PathCommand[];
-    style: SVGStyle;
-}
 /** A pre-compiled shape item that preserves source draw order. */
 export type CompiledItem = {
     kind: "path";
@@ -27,8 +22,6 @@ export interface CompiledSVG {
     msaaSamples?: MsaaSamples | undefined;
     /** Ordered shape list used by the renderer. */
     items: CompiledItem[];
-    /** Backward-compatible path list (all shapes converted to paths). */
-    paths: CompiledPath[];
 }
 /**
  * Compile an SVG string into pre-parsed draw data.

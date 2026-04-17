@@ -1,8 +1,9 @@
 import { type GameObjects, Plugins } from "phaser";
 import type { CompiledSVG } from "./compiler.ts";
 import { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, type SVGPathOptions, drawSVG, drawSVGIfDirty, drawSVGPath, drawSVGPathIfDirty, markSVGDirty, type SVGPluginOptions } from "./draw.ts";
+import { SVGSceneBatch, type SceneBatchDrawOptions, type SceneBatchPathOptions } from "./scene-batch.ts";
 import type { SVGStyle } from "./types.ts";
-export { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, drawSVG, drawSVGIfDirty, drawSVGPath, drawSVGPathIfDirty, markSVGDirty, type SVGPathOptions, type SVGPluginOptions, };
+export { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, drawSVG, drawSVGIfDirty, drawSVGPath, drawSVGPathIfDirty, markSVGDirty, SVGSceneBatch, type SceneBatchDrawOptions, type SceneBatchPathOptions, type SVGPathOptions, type SVGPluginOptions, };
 /**
  * Phaser v4 Scene Plugin — adds `this.svg` to every Scene.
  *
@@ -27,6 +28,7 @@ export { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, drawSVG, d
  */
 export declare class SVGPlugin extends Plugins.ScenePlugin {
     private defaultOptions;
+    private sceneBatch;
     boot(): void;
     /** Set default options for all draw calls in this scene. */
     setDefaults(options: SVGPluginOptions): this;
@@ -46,6 +48,17 @@ export declare class SVGPlugin extends Plugins.ScenePlugin {
     markDirty(graphics: GameObjects.Graphics): this;
     /** Clear remembered dirty state for this Graphics object. */
     clearDirtyState(graphics: GameObjects.Graphics): this;
+    /** Queue an SVG string into the scene batcher for end-of-frame rendering. */
+    queue(svgString: string, options?: SceneBatchDrawOptions | undefined): this;
+    /** Queue a pre-compiled SVG into the scene batcher for end-of-frame rendering. */
+    queueCompiled(compiled: CompiledSVG, options?: SceneBatchDrawOptions | undefined): this;
+    /** Queue a path `d` command list into the scene batcher for end-of-frame rendering. */
+    queuePath(d: string, style?: Partial<SVGStyle> | undefined, options?: SceneBatchPathOptions | undefined): this;
+    /** Flush queued scene batch work immediately. */
+    flushQueue(): boolean;
+    /** Access the underlying scene batch queue instance. */
+    getSceneBatch(): SVGSceneBatch;
+    private ensureSceneBatch;
     destroy(): void;
 }
 //# sourceMappingURL=plugin.d.ts.map

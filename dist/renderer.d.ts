@@ -8,45 +8,6 @@ export interface RenderOptions {
  * Render parsed SVG path commands onto a Phaser Graphics object.
  */
 export declare function renderPath(graphics: GameObjects.Graphics, commands: PathCommand[], style: SVGStyle, options?: RenderOptions | undefined): void;
-interface BridgeEdge {
-    a: {
-        x: number;
-        y: number;
-    };
-    b: {
-        x: number;
-        y: number;
-    };
-}
-/**
- * Merge an outer ring with one or more hole rings into a single simple
- * polygon by inserting bridge edges.
- *
- * For each hole the algorithm finds the pair of vertices (one on the
- * current merged ring, one on the hole) with the smallest Euclidean
- * distance and splices the hole into the ring at that point:
- *
- *   …outer[i] → hole[j] → hole[j-1] → … → hole[j+1] → hole[j] → outer[i] → …
- *
- * The two bridge edges (outer[i]↔hole[j]) are nearly coincident, so the
- * visual result is an invisible slit connecting the boundaries.
- *
- * Returns both the merged ring and the bridge edge locations so the
- * caller can patch hairline rasterization cracks.
- */
-export declare function buildBridgedPolygon(outer: ReadonlyArray<{
-    x: number;
-    y: number;
-}>, holes: ReadonlyArray<ReadonlyArray<{
-    x: number;
-    y: number;
-}>>): {
-    ring: Array<{
-        x: number;
-        y: number;
-    }>;
-    bridges: BridgeEdge[];
-};
 interface FillGroup {
     outer: ReadonlyArray<{
         x: number;

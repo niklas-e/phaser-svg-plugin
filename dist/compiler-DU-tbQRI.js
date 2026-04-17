@@ -786,32 +786,28 @@ function Z(e) {
 //#endregion
 //#region src/compiler.ts
 function Q(e, t) {
-	let n = te(e) ?? null, r = ee(e), s = $(Z(e)), c = [], l = [];
+	let n = te(e) ?? null, r = ee(e), s = $(Z(e)), c = [];
 	for (let { tagName: e, attrs: t } of s) {
 		let n = {
 			...r,
 			...t
-		}, s = i(t.transform), u = m(e, t), d = L(e, n);
-		if (!d) continue;
-		let { d: f, style: p } = d, h = E(f);
-		s && (h = a(h, s), p.strokeWidth *= o(s)), c.push({
-			commands: h,
-			style: p
-		}), u && !s ? l.push({
+		}, s = i(t.transform), l = m(e, t), u = L(e, n);
+		if (!u) continue;
+		let { d, style: f } = u, p = E(d);
+		s && (p = a(p, s), f.strokeWidth *= o(s)), l && !s ? c.push({
 			kind: "native",
-			shape: u,
-			style: p
-		}) : l.push({
+			shape: l,
+			style: f
+		}) : c.push({
 			kind: "path",
-			commands: h,
-			style: p
+			commands: p,
+			style: f
 		});
 	}
 	return {
 		viewBox: n,
 		msaaSamples: t?.msaaSamples,
-		items: l,
-		paths: c
+		items: c
 	};
 }
 function $(e) {

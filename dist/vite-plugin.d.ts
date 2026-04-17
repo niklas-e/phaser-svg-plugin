@@ -1,6 +1,6 @@
 import type { Plugin } from "vite";
 import type { MsaaSamples } from "./render-node/types.ts";
-export type { CompiledItem, CompiledPath, CompiledSVG } from "./compiler.ts";
+export type { CompiledItem, CompiledSVG } from "./compiler.ts";
 export interface PhaserSVGViteOptions {
     /**
      * Global default MSAA samples embedded into all compiled SVG modules.
