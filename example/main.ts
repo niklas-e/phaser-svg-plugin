@@ -332,8 +332,11 @@ for (const tc of testCases) {
         }
 
         const g = this.add.graphics()
-        g.setScale(dpr)
-        drawSVG(g, svg, { width: logicalW, height: logicalH, msaaSamples: 4 })
+        drawSVG(g, svg, {
+          width: logicalW * dpr,
+          height: logicalH * dpr,
+          msaaSamples: 8,
+        })
       }
     }
 
