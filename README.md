@@ -270,9 +270,17 @@ this.svg.setDefaults({
 | --- | --- | --- |
 | `curveTolerance` | `number` | Maximum screen-space curve flattening error. Default is `0.125` for quality-first adaptive tessellation. |
 | `curveResolution` | `number` | Optional fixed points-per-curve override when you need deterministic legacy tessellation. |
+| `width` | `number` | Target output width in the Graphics coordinate space. |
+| `height` | `number` | Target output height in the Graphics coordinate space. |
 | `overrideFill` | `number` | Force fill colour for all shapes |
 | `overrideStroke` | `number` | Force stroke colour for all shapes |
 | `msaaSamples` | `4 \| 8` | MSAA sample count. Default is `4` (quality-first). `8` downgrades to `4` when unsupported. |
+
+`width` and `height` should usually be the final logical size you want in your
+scene, such as `96 x 96`. Do not multiply them by `window.devicePixelRatio`
+unless you are intentionally drawing into a device-pixel-sized surface
+yourself. For best quality, prefer drawing at the final size instead of drawing
+small and then scaling the Graphics object afterward.
 
 For small UI icons, the plugin automatically disables Phaser Graphics path
 simplification for plugin draw calls to preserve detail.
