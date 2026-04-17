@@ -46,7 +46,6 @@ const COMPOUND_FILL_CACHE = new WeakMap<
   ReadonlyArray<CompoundFillGroup>
 >()
 type JoinDecorationOp =
-  | { kind: "circle"; x: number; y: number; radius: number }
   | { kind: "polygon"; points: ReadonlyArray<Point2D> }
 const LINE_JOIN_DECORATION_CACHE = new WeakMap<
   ReadonlyArray<Point2D>,
@@ -134,7 +133,7 @@ function renderSimplePath(
 
   if (tessellated.length === 0) return
 
-  // Fill using bridged polygons so compound paths with holes
+  // Fill using explicit triangulation so compound paths with holes
   // render correctly under WebGL.
   if (canFill && tessellated.some((s) => s.closed)) {
     fillCompoundPath(graphics, tessellated, style, fillAlpha)
@@ -177,7 +176,7 @@ function renderComplexPath(
 
   if (tessellated.length === 0) return
 
-  // Fill using bridged polygons so compound paths with holes render
+  // Fill using explicit triangulation so compound paths with holes render
   // correctly (Phaser's WebGL pipeline doesn't honour winding rules).
   if (canFill && tessellated.some((s) => s.closed)) {
     fillCompoundPath(graphics, tessellated, style, fillAlpha)
@@ -518,91 +517,6 @@ function triangulateFillGroup(group: FillGroup): CompoundFillGroup | null {
   return { points, indices }
 }
 
-interface BridgeEdge {
-  a: { x: number; y: number }
-  b: { x: number; y: number }
-}
-
-/**
- * Merge an outer ring with one or more hole rings into a single simple
- * polygon by inserting bridge edges.
- *
- * For each hole the algorithm finds the pair of vertices (one on the
- * current merged ring, one on the hole) with the smallest Euclidean
- * distance and splices the hole into the ring at that point:
- *
- *   …outer[i] → hole[j] → hole[j-1] → … → hole[j+1] → hole[j] → outer[i] → …
- *
- * The two bridge edges (outer[i]↔hole[j]) are nearly coincident, so the
- * visual result is an invisible slit connecting the boundaries.
- *
- * Returns both the merged ring and the bridge edge locations so the
- * caller can patch hairline rasterization cracks.
- */
-export function buildBridgedPolygon(
-  outer: ReadonlyArray<{ x: number; y: number }>,
-  holes: ReadonlyArray<ReadonlyArray<{ x: number; y: number }>>,
-): { ring: Array<{ x: number; y: number }>; bridges: BridgeEdge[] } {
-  // Start with a mutable copy of the outer ring
-  let ring: Array<{ x: number; y: number }> = Array.from(outer)
-  const bridges: BridgeEdge[] = []
-
-  for (const hole of holes) {
-    // Find closest vertex pair between current ring and hole
-    let bestDist = Infinity
-    let bestRingIdx = 0
-    let bestHoleIdx = 0
-
-    for (let ri = 0; ri < ring.length; ri++) {
-      const rp = assertDefined(ring[ri])
-      for (let hi = 0; hi < hole.length; hi++) {
-        const hp = assertDefined(hole[hi])
-        const dx = rp.x - hp.x
-        const dy = rp.y - hp.y
-        const dist = dx * dx + dy * dy
-        if (dist < bestDist) {
-          bestDist = dist
-          bestRingIdx = ri
-          bestHoleIdx = hi
-        }
-      }
-    }
-
-    // Splice the hole into the ring at the bridge point.
-    // The hole is traversed starting from bestHoleIdx, wrapping around,
-    // and ending back at bestHoleIdx. Then we return to the ring vertex.
-    const bridgeOuter = assertDefined(ring[bestRingIdx])
-    const bridgeHole = assertDefined(hole[bestHoleIdx])
-    const holeLen = hole.length
-
-    bridges.push({ a: bridgeOuter, b: bridgeHole })
-
-    const spliced: Array<{ x: number; y: number }> = []
-
-    // Outer ring up to and including the bridge point
-    for (let i = 0; i <= bestRingIdx; i++) {
-      spliced.push(assertDefined(ring[i]))
-    }
-
-    // Traverse hole starting from bridge point, full loop back
-    for (let i = 0; i <= holeLen; i++) {
-      spliced.push(assertDefined(hole[(bestHoleIdx + i) % holeLen]))
-    }
-
-    // Bridge back: duplicate the outer bridge vertex
-    spliced.push(bridgeOuter)
-
-    // Rest of outer ring after bridge point
-    for (let i = bestRingIdx + 1; i < ring.length; i++) {
-      spliced.push(assertDefined(ring[i]))
-    }
-
-    ring = spliced
-  }
-
-  return { ring, bridges }
-}
-
 // ---------------------------------------------------------------------------
 // Winding-direction subpath grouping for earcut
 // ---------------------------------------------------------------------------
@@ -906,7 +820,7 @@ export function splitSubpaths(commands: PathCommand[]): PathCommand[][] {
 
 /**
  * Draw line join decorations at vertices.
- * Handles round (circles) and bevel (triangles) joins.
+ * Handles round and bevel/miter joins with polygonal decorations.
  */
 function drawLineJoins(
   graphics: GameObjects.Graphics,
@@ -923,11 +837,6 @@ function drawLineJoins(
   graphics.fillStyle(style.stroke, strokeAlpha)
 
   for (const op of decorations) {
-    if (op.kind === "circle") {
-      graphics.fillCircle(op.x, op.y, op.radius)
-      continue
-    }
-
     fillPolygon(graphics, op.points)
   }
 }
@@ -964,7 +873,10 @@ function getLineJoinDecorations(
       const next = assertDefined(points[(i + 1) % n])
 
       if (style.lineJoin === "round") {
-        ops.push({ kind: "circle", x: curr.x, y: curr.y, radius: hw })
+        ops.push({
+          kind: "polygon",
+          points: createRoundDisk(curr, hw),
+        })
       } else if (style.lineJoin === "bevel") {
         const bevel = computeBevelJoin(prev, curr, next, hw)
         if (bevel) {
@@ -990,8 +902,14 @@ function getLineJoinDecorations(
     if (style.lineCap === "round") {
       const first = assertDefined(points[0])
       const last = assertDefined(points[n - 1])
-      ops.push({ kind: "circle", x: first.x, y: first.y, radius: hw })
-      ops.push({ kind: "circle", x: last.x, y: last.y, radius: hw })
+      ops.push({
+        kind: "polygon",
+        points: createRoundDisk(first, hw),
+      })
+      ops.push({
+        kind: "polygon",
+        points: createRoundDisk(last, hw),
+      })
     } else if (style.lineCap === "square") {
       const first = assertDefined(points[0])
       const second = assertDefined(points[1])
@@ -1097,4 +1015,28 @@ function fillPolygon(
     const c = assertDefined(points[assertDefined(indices[i + 2])])
     graphics.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y)
   }
+}
+
+function createRoundDisk(center: Point2D, radius: number): Point2D[] {
+  const segments = resolveRoundSegments(radius)
+  const points: Point2D[] = []
+
+  for (let i = 0; i < segments; i++) {
+    const theta = (i / segments) * Math.PI * 2
+    points.push({
+      x: center.x + Math.cos(theta) * radius,
+      y: center.y + Math.sin(theta) * radius,
+    })
+  }
+
+  return points
+}
+
+function resolveRoundSegments(radius: number): number {
+  const circumference = Math.max(1, 2 * Math.PI * radius)
+  return clamp(Math.ceil(circumference / 2), 12, 48)
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value))
 }

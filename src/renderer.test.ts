@@ -3,7 +3,6 @@ import { describe, it } from "node:test"
 import { assertDefined } from "./assert.ts"
 import type { PathCommand } from "./types.ts"
 import {
-  buildBridgedPolygon,
   deduplicatePoints,
   groupSubpathsForFill,
   signedArea2,
@@ -217,96 +216,3 @@ describe("groupSubpathsForFill", () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// buildBridgedPolygon
-// ---------------------------------------------------------------------------
-
-describe("buildBridgedPolygon", () => {
-  it("merges outer and hole into a single ring", () => {
-    const outer = [
-      { x: 0, y: 0 },
-      { x: 100, y: 0 },
-      { x: 100, y: 100 },
-      { x: 0, y: 100 },
-    ]
-    const hole = [
-      { x: 30, y: 30 },
-      { x: 30, y: 70 },
-      { x: 70, y: 70 },
-      { x: 70, y: 30 },
-    ]
-    const result = buildBridgedPolygon(outer, [hole])
-    // Should contain all outer + all hole points + bridge duplicates
-    assert.ok(result.ring.length > outer.length + hole.length)
-    assert.equal(result.bridges.length, 1)
-  })
-
-  it("bridge endpoints connect outer and hole vertices", () => {
-    const outer = [
-      { x: 0, y: 0 },
-      { x: 100, y: 0 },
-      { x: 100, y: 100 },
-      { x: 0, y: 100 },
-    ]
-    const hole = [
-      { x: 40, y: 40 },
-      { x: 40, y: 60 },
-      { x: 60, y: 60 },
-      { x: 60, y: 40 },
-    ]
-    const result = buildBridgedPolygon(outer, [hole])
-    const bridge = assertDefined(result.bridges[0])
-    // Bridge a should be from the outer ring
-    assert.ok(outer.some((p) => p.x === bridge.a.x && p.y === bridge.a.y))
-    // Bridge b should be from the hole ring
-    assert.ok(hole.some((p) => p.x === bridge.b.x && p.y === bridge.b.y))
-  })
-
-  it("handles multiple holes", () => {
-    const outer = [
-      { x: 0, y: 0 },
-      { x: 200, y: 0 },
-      { x: 200, y: 200 },
-      { x: 0, y: 200 },
-    ]
-    const hole1 = [
-      { x: 20, y: 20 },
-      { x: 20, y: 80 },
-      { x: 80, y: 80 },
-      { x: 80, y: 20 },
-    ]
-    const hole2 = [
-      { x: 120, y: 120 },
-      { x: 120, y: 180 },
-      { x: 180, y: 180 },
-      { x: 180, y: 120 },
-    ]
-    const result = buildBridgedPolygon(outer, [hole1, hole2])
-    assert.equal(result.bridges.length, 2)
-    // Ring should contain all points from outer + both holes + bridge duplicates
-    assert.ok(result.ring.length > outer.length + hole1.length + hole2.length)
-  })
-
-  it("merged ring forms a valid simple polygon (no repeated subsequences)", () => {
-    const outer = [
-      { x: 0, y: 0 },
-      { x: 10, y: 0 },
-      { x: 10, y: 10 },
-      { x: 0, y: 10 },
-    ]
-    const hole = [
-      { x: 3, y: 3 },
-      { x: 3, y: 7 },
-      { x: 7, y: 7 },
-      { x: 7, y: 3 },
-    ]
-    const result = buildBridgedPolygon(outer, [hole])
-    // The ring should visit the hole bridge point exactly twice
-    // (once going in, once coming out)
-    const bridge = assertDefined(result.bridges[0])
-    const visits = result.ring.filter(
-      (p) => p.x === bridge.b.x && p.y === bridge.b.y,
-    )
-    assert.equal(visits.length, 2)
-  })
-})

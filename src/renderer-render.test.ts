@@ -142,6 +142,6 @@ describe("renderPath fast paths", () => {
     renderPath(graphics as never, OPEN_PATH, style)
 
     assert.ok(graphics.calls.fillTriangle > 0)
-    assert.ok(graphics.calls.fillCircle > 0)
+    assert.equal(graphics.calls.fillCircle, 0)
   })
 })
