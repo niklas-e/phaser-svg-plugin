@@ -7,10 +7,9 @@ const PRESENTATION_ATTR_NAMES = new Set([
   "stroke-linejoin",
   "stroke-linecap",
   "stroke-miterlimit",
-  "opacity",
 ])
 
-/** Keep only SVG presentation attributes that affect paint/style inheritance. */
+/** Keep only inheritable SVG presentation attributes used by this renderer. */
 export function filterPresentationAttrs(
   attrs: Record<string, string>,
 ): Record<string, string> {

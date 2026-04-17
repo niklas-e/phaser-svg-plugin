@@ -106,6 +106,7 @@ export class SVGPlugin extends Plugins.ScenePlugin {
   ): void {
     const pathDefaults: SVGPathOptions = {
       curveResolution: this.defaultOptions.curveResolution,
+      curveTolerance: this.defaultOptions.curveTolerance,
       msaaSamples: this.defaultOptions.msaaSamples,
     }
     drawSVGPath(graphics, d, style, { ...pathDefaults, ...options })
@@ -120,6 +121,7 @@ export class SVGPlugin extends Plugins.ScenePlugin {
   ): boolean {
     const pathDefaults: SVGPathOptions = {
       curveResolution: this.defaultOptions.curveResolution,
+      curveTolerance: this.defaultOptions.curveTolerance,
       msaaSamples: this.defaultOptions.msaaSamples,
     }
     return drawSVGPathIfDirty(graphics, d, style, {
@@ -165,10 +167,7 @@ export class SVGPlugin extends Plugins.ScenePlugin {
   }
 
   /** Queue an SVG string into the scene batcher for end-of-frame rendering. */
-  queue(
-    svgString: string,
-    options?: SceneBatchDrawOptions | undefined,
-  ): this {
+  queue(svgString: string, options?: SceneBatchDrawOptions | undefined): this {
     this.ensureSceneBatch().queueSVG(svgString, {
       ...this.defaultOptions,
       ...options,
@@ -196,6 +195,7 @@ export class SVGPlugin extends Plugins.ScenePlugin {
   ): this {
     const pathDefaults: SceneBatchPathOptions = {
       curveResolution: this.defaultOptions.curveResolution,
+      curveTolerance: this.defaultOptions.curveTolerance,
       msaaSamples: this.defaultOptions.msaaSamples,
     }
 

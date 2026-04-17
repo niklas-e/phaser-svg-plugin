@@ -209,11 +209,18 @@ function getSampledEllipse(
 }
 
 function computeEllipseSegments(rx: number, ry: number): number {
-  // Ramanujan approximation. About 2px edge length keeps curves smooth
-  // without creating excessive triangles.
-  const circumference =
-    Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)))
-  return clamp(Math.ceil(circumference / 2), 24, 256)
+  const maxRadius = Math.max(Math.abs(rx), Math.abs(ry))
+  if (maxRadius <= 0) {
+    return 24
+  }
+
+  const tolerance = clamp(0.25, 1e-4, maxRadius)
+  const ratio = clamp(1 - tolerance / maxRadius, -1, 1)
+  const maxAngle = 2 * Math.acos(ratio)
+  const safeAngle =
+    Number.isFinite(maxAngle) && maxAngle > 0 ? maxAngle : Math.PI / 16
+
+  return clamp(Math.ceil((Math.PI * 2) / safeAngle), 24, 512)
 }
 
 function clamp(value: number, min: number, max: number): number {

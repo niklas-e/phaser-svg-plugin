@@ -3,11 +3,23 @@ import { describe, it } from "node:test"
 import {
   applyCrispPathDetailThreshold,
   resolveCurveResolution,
+  resolveCurveTolerance,
 } from "./quality.ts"
 
+describe("resolveCurveTolerance", () => {
+  it("uses adaptive default tolerance when not provided", () => {
+    assert.equal(resolveCurveTolerance(undefined), 0.25)
+  })
+
+  it("prefers explicit curveTolerance", () => {
+    assert.equal(resolveCurveTolerance({ curveTolerance: 0.1 }), 0.1)
+    assert.equal(resolveCurveTolerance({ curveTolerance: 0.5 }), 0.5)
+  })
+})
+
 describe("resolveCurveResolution", () => {
-  it("uses default resolution when not provided", () => {
-    assert.equal(resolveCurveResolution(undefined), 32)
+  it("returns undefined when adaptive tessellation is active", () => {
+    assert.equal(resolveCurveResolution(undefined), undefined)
   })
 
   it("prefers explicit curveResolution", () => {

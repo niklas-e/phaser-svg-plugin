@@ -1,18 +1,21 @@
 import type { GameObjects } from "phaser"
 import earcut from "earcut"
 import { assertDefined } from "./assert.ts"
+import { triangulateContours } from "./fill-tessellator.ts"
 import { computeSquareCap } from "./line-cap.ts"
 import {
   computeBevelJoin,
   computeMiterJoin,
   type Point2D,
 } from "./line-join.ts"
-import { resolveCurveResolution } from "./quality.ts"
+import { resolveCurveResolution, resolveCurveTolerance } from "./quality.ts"
 import type { PathCommand, SVGStyle } from "./types.ts"
 
 export interface RenderOptions {
-  /** Points per curve segment for tessellation. */
+  /** Fixed points per curve segment for legacy tessellation control. */
   curveResolution?: number | undefined
+  /** Maximum screen-space flattening error for adaptive tessellation. */
+  curveTolerance?: number | undefined
 }
 
 interface SimpleSubpath {
@@ -32,21 +35,16 @@ const SIMPLE_SUBPATH_CACHE = new WeakMap<
 >()
 const TESSELLATED_SUBPATH_CACHE = new WeakMap<
   PathCommand[],
-  Map<number, ReadonlyArray<TessellatedSubpath>>
+  Map<string, ReadonlyArray<TessellatedSubpath>>
 >()
-type CompoundFillGroup = {
-  points: ReadonlyArray<{ x: number; y: number }>
-  indices: ReadonlyArray<number>
-}
 const COMPOUND_FILL_CACHE = new WeakMap<
   ReadonlyArray<{
     points: ReadonlyArray<{ x: number; y: number }>
     closed: boolean
   }>,
-  ReadonlyArray<CompoundFillGroup>
+  ReadonlyArray<number>
 >()
-type JoinDecorationOp =
-  | { kind: "polygon"; points: ReadonlyArray<Point2D> }
+type JoinDecorationOp = { kind: "polygon"; points: ReadonlyArray<Point2D> }
 const LINE_JOIN_DECORATION_CACHE = new WeakMap<
   ReadonlyArray<Point2D>,
   Map<string, ReadonlyArray<JoinDecorationOp>>
@@ -171,8 +169,7 @@ function renderComplexPath(
   canStroke: boolean,
   options?: RenderOptions | undefined,
 ): void {
-  const resolution = resolveCurveResolution(options)
-  const tessellated = getTessellatedSubpaths(commands, resolution)
+  const tessellated = getTessellatedSubpaths(commands, options)
 
   if (tessellated.length === 0) return
 
@@ -233,15 +230,22 @@ function getSimpleSubpaths(
 
 function getTessellatedSubpaths(
   commands: PathCommand[],
-  resolution: number,
+  options?: RenderOptions | undefined,
 ): ReadonlyArray<TessellatedSubpath> {
-  let byResolution = TESSELLATED_SUBPATH_CACHE.get(commands)
-  if (!byResolution) {
-    byResolution = new Map<number, ReadonlyArray<TessellatedSubpath>>()
-    TESSELLATED_SUBPATH_CACHE.set(commands, byResolution)
+  let byQuality = TESSELLATED_SUBPATH_CACHE.get(commands)
+  if (!byQuality) {
+    byQuality = new Map<string, ReadonlyArray<TessellatedSubpath>>()
+    TESSELLATED_SUBPATH_CACHE.set(commands, byQuality)
   }
 
-  const cached = byResolution.get(resolution)
+  const fixedSegments = resolveCurveResolution(options)
+  const tolerance = resolveCurveTolerance(options)
+  const cacheKey =
+    fixedSegments !== undefined
+      ? `segments:${fixedSegments}`
+      : `tolerance:${tolerance.toFixed(4)}`
+
+  const cached = byQuality.get(cacheKey)
   if (cached) {
     return cached
   }
@@ -274,37 +278,69 @@ function getTessellatedSubpaths(
           points.push({ x: cx, y: cy })
           break
         case "C":
-          tessellateCubic(
-            cx,
-            cy,
-            cmd.x1,
-            cmd.y1,
-            cmd.x2,
-            cmd.y2,
-            cmd.x,
-            cmd.y,
-            resolution,
-            points,
-          )
+          if (fixedSegments !== undefined) {
+            tessellateCubicFixed(
+              cx,
+              cy,
+              cmd.x1,
+              cmd.y1,
+              cmd.x2,
+              cmd.y2,
+              cmd.x,
+              cmd.y,
+              fixedSegments,
+              points,
+            )
+          } else {
+            tessellateCubicAdaptive(
+              cx,
+              cy,
+              cmd.x1,
+              cmd.y1,
+              cmd.x2,
+              cmd.y2,
+              cmd.x,
+              cmd.y,
+              tolerance,
+              points,
+            )
+          }
           cx = cmd.x
           cy = cmd.y
           break
         case "Q":
-          tessellateQuadratic(
-            cx,
-            cy,
-            cmd.x1,
-            cmd.y1,
-            cmd.x,
-            cmd.y,
-            resolution,
-            points,
-          )
+          if (fixedSegments !== undefined) {
+            tessellateQuadraticFixed(
+              cx,
+              cy,
+              cmd.x1,
+              cmd.y1,
+              cmd.x,
+              cmd.y,
+              fixedSegments,
+              points,
+            )
+          } else {
+            tessellateQuadraticAdaptive(
+              cx,
+              cy,
+              cmd.x1,
+              cmd.y1,
+              cmd.x,
+              cmd.y,
+              tolerance,
+              points,
+            )
+          }
           cx = cmd.x
           cy = cmd.y
           break
         case "A": {
-          tessellateArc(cx, cy, cmd, resolution, points)
+          if (fixedSegments !== undefined) {
+            tessellateArcFixed(cx, cy, cmd, fixedSegments, points)
+          } else {
+            tessellateArcAdaptive(cx, cy, cmd, tolerance, points)
+          }
           cx = cmd.x
           cy = cmd.y
           break
@@ -321,15 +357,17 @@ function getTessellatedSubpaths(
     }
   }
 
-  byResolution.set(resolution, tessellated)
+  byQuality.set(cacheKey, tessellated)
   return tessellated
 }
 
 // ---------------------------------------------------------------------------
-// Manual curve tessellation — gives resolution points PER curve segment
+// Curve tessellation
 // ---------------------------------------------------------------------------
 
-function tessellateCubic(
+const MAX_CURVE_RECURSION_DEPTH = 12
+
+function tessellateCubicFixed(
   x0: number,
   y0: number,
   x1: number,
@@ -352,7 +390,7 @@ function tessellateCubic(
   }
 }
 
-function tessellateQuadratic(
+function tessellateQuadraticFixed(
   x0: number,
   y0: number,
   x1: number,
@@ -371,7 +409,7 @@ function tessellateQuadratic(
   }
 }
 
-function tessellateArc(
+function tessellateArcFixed(
   cx: number,
   cy: number,
   cmd: Extract<PathCommand, { type: "A" }>,
@@ -413,6 +451,213 @@ function tessellateArc(
   }
 }
 
+function tessellateCubicAdaptive(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+  tolerance: number,
+  out: Point2D[],
+  depth = 0,
+): void {
+  if (
+    depth >= MAX_CURVE_RECURSION_DEPTH ||
+    isCubicFlatEnough(x0, y0, x1, y1, x2, y2, x3, y3, tolerance)
+  ) {
+    out.push({ x: x3, y: y3 })
+    return
+  }
+
+  const x01 = (x0 + x1) / 2
+  const y01 = (y0 + y1) / 2
+  const x12 = (x1 + x2) / 2
+  const y12 = (y1 + y2) / 2
+  const x23 = (x2 + x3) / 2
+  const y23 = (y2 + y3) / 2
+  const x012 = (x01 + x12) / 2
+  const y012 = (y01 + y12) / 2
+  const x123 = (x12 + x23) / 2
+  const y123 = (y12 + y23) / 2
+  const x0123 = (x012 + x123) / 2
+  const y0123 = (y012 + y123) / 2
+
+  tessellateCubicAdaptive(
+    x0,
+    y0,
+    x01,
+    y01,
+    x012,
+    y012,
+    x0123,
+    y0123,
+    tolerance,
+    out,
+    depth + 1,
+  )
+  tessellateCubicAdaptive(
+    x0123,
+    y0123,
+    x123,
+    y123,
+    x23,
+    y23,
+    x3,
+    y3,
+    tolerance,
+    out,
+    depth + 1,
+  )
+}
+
+function tessellateQuadraticAdaptive(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  tolerance: number,
+  out: Point2D[],
+  depth = 0,
+): void {
+  if (
+    depth >= MAX_CURVE_RECURSION_DEPTH ||
+    isQuadraticFlatEnough(x0, y0, x1, y1, x2, y2, tolerance)
+  ) {
+    out.push({ x: x2, y: y2 })
+    return
+  }
+
+  const x01 = (x0 + x1) / 2
+  const y01 = (y0 + y1) / 2
+  const x12 = (x1 + x2) / 2
+  const y12 = (y1 + y2) / 2
+  const x012 = (x01 + x12) / 2
+  const y012 = (y01 + y12) / 2
+
+  tessellateQuadraticAdaptive(
+    x0,
+    y0,
+    x01,
+    y01,
+    x012,
+    y012,
+    tolerance,
+    out,
+    depth + 1,
+  )
+  tessellateQuadraticAdaptive(
+    x012,
+    y012,
+    x12,
+    y12,
+    x2,
+    y2,
+    tolerance,
+    out,
+    depth + 1,
+  )
+}
+
+function tessellateArcAdaptive(
+  cx: number,
+  cy: number,
+  cmd: Extract<PathCommand, { type: "A" }>,
+  tolerance: number,
+  out: Point2D[],
+): void {
+  const arc = endpointToCenter(
+    cx,
+    cy,
+    cmd.rx,
+    cmd.ry,
+    cmd.xAxisRotation,
+    cmd.largeArc,
+    cmd.sweep,
+    cmd.x,
+    cmd.y,
+  )
+
+  const sweep = Math.abs(arc.endAngle - arc.startAngle)
+  const steps = computeArcSteps(arc.rx, arc.ry, sweep, tolerance)
+  tessellateArcFixed(cx, cy, cmd, steps, out)
+}
+
+function isCubicFlatEnough(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+  tolerance: number,
+): boolean {
+  const toleranceSq = tolerance * tolerance
+  return (
+    pointLineDistanceSq(x1, y1, x0, y0, x3, y3) <= toleranceSq &&
+    pointLineDistanceSq(x2, y2, x0, y0, x3, y3) <= toleranceSq
+  )
+}
+
+function isQuadraticFlatEnough(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  tolerance: number,
+): boolean {
+  return pointLineDistanceSq(x1, y1, x0, y0, x2, y2) <= tolerance * tolerance
+}
+
+function pointLineDistanceSq(
+  px: number,
+  py: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+): number {
+  const dx = x1 - x0
+  const dy = y1 - y0
+  const lenSq = dx * dx + dy * dy
+  if (lenSq <= 1e-12) {
+    const ox = px - x0
+    const oy = py - y0
+    return ox * ox + oy * oy
+  }
+
+  const cross = dx * (py - y0) - dy * (px - x0)
+  return (cross * cross) / lenSq
+}
+
+function computeArcSteps(
+  rx: number,
+  ry: number,
+  sweep: number,
+  tolerance: number,
+): number {
+  const maxRadius = Math.max(Math.abs(rx), Math.abs(ry))
+  if (maxRadius <= 0 || sweep <= 0) {
+    return 1
+  }
+
+  const clampedTolerance = clamp(tolerance, 1e-4, maxRadius)
+  const ratio = clamp(1 - clampedTolerance / maxRadius, -1, 1)
+  const maxAngle = 2 * Math.acos(ratio)
+  const safeAngle =
+    Number.isFinite(maxAngle) && maxAngle > 0 ? maxAngle : Math.PI / 16
+
+  return clamp(Math.ceil(sweep / safeAngle), 1, 2048)
+}
+
 /**
  * Fill compound paths (with holes) using explicit triangulation.
  *
@@ -428,93 +673,47 @@ function fillCompoundPath(
   style: SVGStyle,
   fillAlpha: number,
 ): void {
-  const groups = getCompoundFillGroups(subpaths)
-  if (groups.length === 0) return
+  const triangles = getCompoundFillTriangles(subpaths)
+  if (triangles.length === 0) return
 
   graphics.fillStyle(assertDefined(style.fill), fillAlpha)
 
-  for (const group of groups) {
-    for (let i = 0; i + 2 < group.indices.length; i += 3) {
-      const ia = assertDefined(group.indices[i])
-      const ib = assertDefined(group.indices[i + 1])
-      const ic = assertDefined(group.indices[i + 2])
-      const a = assertDefined(group.points[ia])
-      const b = assertDefined(group.points[ib])
-      const c = assertDefined(group.points[ic])
-      graphics.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y)
-    }
+  for (let i = 0; i + 5 < triangles.length; i += 6) {
+    graphics.fillTriangle(
+      assertDefined(triangles[i]),
+      assertDefined(triangles[i + 1]),
+      assertDefined(triangles[i + 2]),
+      assertDefined(triangles[i + 3]),
+      assertDefined(triangles[i + 4]),
+      assertDefined(triangles[i + 5]),
+    )
   }
 }
 
-function getCompoundFillGroups(
+function getCompoundFillTriangles(
   subpaths: ReadonlyArray<{
     points: ReadonlyArray<{ x: number; y: number }>
     closed: boolean
   }>,
-): ReadonlyArray<CompoundFillGroup> {
+): ReadonlyArray<number> {
   const cached = COMPOUND_FILL_CACHE.get(subpaths)
   if (cached) {
     return cached
   }
 
-  const closed = subpaths.filter((s) => s.closed)
-  if (closed.length === 0) {
+  const contours = subpaths
+    .filter((subpath) => subpath.closed)
+    .map((subpath) => deduplicatePoints([...subpath.points]))
+    .filter((points) => points.length >= 3)
+
+  if (contours.length === 0) {
     COMPOUND_FILL_CACHE.set(subpaths, [])
     return []
   }
 
-  const grouped = groupSubpathsForFill(closed)
-  const prepared: CompoundFillGroup[] = []
-
-  for (const group of grouped) {
-    const triangulated = triangulateFillGroup(group)
-    if (triangulated) {
-      prepared.push(triangulated)
-    }
-  }
-
-  COMPOUND_FILL_CACHE.set(subpaths, prepared)
-  return prepared
-}
-
-function triangulateFillGroup(group: FillGroup): CompoundFillGroup | null {
-  if (group.outer.length < 3) {
-    return null
-  }
-
-  const vertices: number[] = []
-  const holeIndices: number[] = []
-
-  const appendRing = (ring: ReadonlyArray<{ x: number; y: number }>) => {
-    for (const point of ring) {
-      vertices.push(point.x, point.y)
-    }
-  }
-
-  appendRing(group.outer)
-
-  for (const hole of group.holes) {
-    if (hole.length < 3) {
-      continue
-    }
-    holeIndices.push(vertices.length / 2)
-    appendRing(hole)
-  }
-
-  const indices = earcut(vertices, holeIndices, 2)
-  if (indices.length === 0) {
-    return null
-  }
-
-  const points: Array<{ x: number; y: number }> = []
-  for (let i = 0; i < vertices.length; i += 2) {
-    points.push({
-      x: assertDefined(vertices[i]),
-      y: assertDefined(vertices[i + 1]),
-    })
-  }
-
-  return { points, indices }
+  const triangles = triangulateContours(contours)
+  COMPOUND_FILL_CACHE.set(subpaths, triangles)
+  return triangles
 }
 
 // ---------------------------------------------------------------------------
@@ -763,10 +962,10 @@ function vectorAngle(ux: number, uy: number, vx: number, vy: number): number {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const EPSILON_SQ = 0.01 // squared distance threshold for deduplication
+const EPSILON_SQ = 1e-8 // squared distance threshold for deduplication
 
 /**
- * Remove consecutive near-duplicate points that confuse earcut.
+ * Remove consecutive near-duplicate points that create degenerate geometry.
  * Also strips a duplicate closing vertex (last ≈ first).
  */
 export function deduplicatePoints<T extends { x: number; y: number }>(

@@ -4,16 +4,29 @@ interface RendererConfigLike {
   pathDetailThreshold?: number | undefined
 }
 
+const DEFAULT_CURVE_TOLERANCE = 0.25
+
 /**
- * Resolve the effective curve tessellation resolution.
+ * Resolve the effective curve flattening tolerance.
  *
- * Explicit `curveResolution` always wins.
- * Otherwise, the renderer defaults to 32 points per curve segment.
+ * Explicit `curveTolerance` wins.
+ * Otherwise, the renderer defaults to a quarter-pixel screen-space error.
+ */
+export function resolveCurveTolerance(
+  options?: Pick<RenderOptions, "curveTolerance"> | undefined,
+): number {
+  return options?.curveTolerance ?? DEFAULT_CURVE_TOLERANCE
+}
+
+/**
+ * Explicit fixed-segment override for curve flattening.
+ *
+ * When omitted, the renderer uses adaptive subdivision.
  */
 export function resolveCurveResolution(
   options?: Pick<RenderOptions, "curveResolution"> | undefined,
-): number {
-  return options?.curveResolution ?? 32
+): number | undefined {
+  return options?.curveResolution
 }
 
 /**

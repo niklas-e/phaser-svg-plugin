@@ -52,7 +52,7 @@ describe("deduplicatePoints", () => {
   it("removes consecutive near-duplicate points", () => {
     const points = [
       { x: 0, y: 0 },
-      { x: 0.05, y: 0.05 }, // within EPSILON_SQ = 0.01 → dist² = 0.005
+      { x: 0.00005, y: 0.00005 },
       { x: 10, y: 10 },
     ]
     const result = deduplicatePoints(points)
@@ -66,7 +66,7 @@ describe("deduplicatePoints", () => {
       { x: 0, y: 0 },
       { x: 10, y: 0 },
       { x: 10, y: 10 },
-      { x: 0.05, y: 0.05 },
+      { x: 0.00005, y: 0.00005 },
     ]
     const result = deduplicatePoints(points)
     assert.equal(result.length, 3)
@@ -215,4 +215,3 @@ describe("groupSubpathsForFill", () => {
     assert.equal(groupWithHole.outer, smallOuter)
   })
 })
-

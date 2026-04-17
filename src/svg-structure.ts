@@ -12,6 +12,10 @@ const NON_RENDERABLE_CONTAINER_TAGS = [
 const NON_RENDERABLE_CONTAINER_SELECTOR =
   NON_RENDERABLE_CONTAINER_TAGS.join(",")
 
+export function isNonRenderableContainerTag(tagName: string): boolean {
+  return NON_RENDERABLE_CONTAINER_TAGS.includes(tagName)
+}
+
 /** True when element is inside a non-renderable SVG definition container. */
 export function isInsideNonRenderableContainer(el: Element): boolean {
   return el.closest(NON_RENDERABLE_CONTAINER_SELECTOR) !== null

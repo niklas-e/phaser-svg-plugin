@@ -223,7 +223,7 @@ function transformPoint(
   }
 }
 
-function multiplyAffine(left: Affine2D, right: Affine2D): Affine2D {
+export function multiplyAffine(left: Affine2D, right: Affine2D): Affine2D {
   return {
     a: left.a * right.a + left.c * right.b,
     b: left.b * right.a + left.d * right.b,

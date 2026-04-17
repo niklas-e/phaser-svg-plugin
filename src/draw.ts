@@ -1,20 +1,7 @@
 import type { GameObjects } from "phaser"
-import {
-  parseTransform,
-  strokeScaleFromAffine,
-  transformPathCommandsAffine,
-} from "./affine-transform.ts"
-import type { CompiledItem, CompiledSVG } from "./compiler.ts"
-import {
-  drawNativeShape,
-  parseNativeShape,
-  transformNativeShape,
-} from "./native-shape.ts"
+import { compileSVG, type CompiledItem, type CompiledSVG } from "./compiler.ts"
+import { drawNativeShape, transformNativeShape } from "./native-shape.ts"
 import { parsePath } from "./path-parser.ts"
-import {
-  attrsFromElement,
-  filterPresentationAttrs,
-} from "./presentation-attrs.ts"
 import {
   clearDirtyState,
   commitDirtyState,
@@ -26,9 +13,6 @@ import { applyCrispPathDetailThreshold } from "./quality.ts"
 import { type RenderOptions, renderPath } from "./renderer.ts"
 import { attachMsaaRenderStep } from "./render-node/svg-render-node.ts"
 import type { MsaaOptions, MsaaSamples } from "./render-node/types.ts"
-import { convertShape } from "./shape.ts"
-import { isInsideNonRenderableContainer } from "./svg-structure.ts"
-import { resolveStyle } from "./style.ts"
 import { transformCommands, viewBoxTransform } from "./transform.ts"
 import type { SVGStyle, ViewBox } from "./types.ts"
 
@@ -57,6 +41,8 @@ const transformedItemCache = new WeakMap<
 >()
 const styleOverrideCache = new WeakMap<SVGStyle, Map<string, SVGStyle>>()
 const compiledIdentityByRef = new WeakMap<CompiledSVG, number>()
+const runtimeCompiledCache = new Map<string, CompiledSVG>()
+const RUNTIME_COMPILED_CACHE_MAX_ENTRIES = 128
 let nextCompiledIdentity = 1
 
 /**
@@ -138,7 +124,9 @@ function drawSVGInternal(
   svgString: string,
   options?: SVGPluginOptions | undefined,
 ): boolean {
-  const stateKey = `svg|${svgString}|${pluginOptionsStateKey(options)}`
+  const compiled = getRuntimeCompiledSVG(svgString)
+  const compiledMsaaSamples = resolveCompiledMsaaSamples(compiled, options)
+  const stateKey = `svg|${compiledIdentity(compiled)}|${compiledOptionsStateKey(options, compiledMsaaSamples)}`
   if (!isDirtyForState(graphics, stateKey)) {
     return false
   }
@@ -149,89 +137,8 @@ function drawSVGInternal(
 
   applyGraphicsCrispDefaults(graphics)
 
-  const parser = new DOMParser()
-  const doc = parser.parseFromString(svgString, "image/svg+xml")
-
-  const svgEl = doc.documentElement
-  const inheritedStyleAttrs = filterPresentationAttrs(attrsFromElement(svgEl))
-  const viewBox = parseViewBox(svgEl.getAttribute("viewBox"))
-  const transform = computeTransform(viewBox, options)
-
-  const shapes = doc.querySelectorAll(
-    "path,rect,circle,ellipse,line,polyline,polygon",
-  )
-
-  for (const shapeEl of shapes) {
-    if (isInsideNonRenderableContainer(shapeEl)) {
-      continue
-    }
-
-    const attrs = attrsFromElement(shapeEl)
-    const elementTransform = parseTransform(attrs.transform)
-
-    const styleAttrs = { ...inheritedStyleAttrs, ...attrs }
-
-    const nativeShape = parseNativeShape(shapeEl.tagName, attrs)
-    if (nativeShape && !elementTransform) {
-      const style = resolveStyle(styleAttrs)
-
-      if (options?.overrideFill !== undefined) {
-        style.fill = options.overrideFill
-      }
-      if (options?.overrideStroke !== undefined) {
-        style.stroke = options.overrideStroke
-      }
-
-      const transformedShape =
-        transform === undefined
-          ? nativeShape
-          : transformNativeShape(
-              nativeShape,
-              transform.scale,
-              transform.tx,
-              transform.ty,
-            )
-
-      if (transform) {
-        style.strokeWidth *= transform.scale
-      }
-
-      drawNativeShape(graphics, transformedShape, style)
-      continue
-    }
-
-    const converted = convertShape(shapeEl.tagName, styleAttrs)
-    if (!converted) continue
-
-    const { d, style } = converted
-
-    if (options?.overrideFill !== undefined) {
-      style.fill = options.overrideFill
-    }
-    if (options?.overrideStroke !== undefined) {
-      style.stroke = options.overrideStroke
-    }
-
-    let commands = parsePath(d)
-    if (elementTransform) {
-      commands = transformPathCommandsAffine(commands, elementTransform)
-      style.strokeWidth *= strokeScaleFromAffine(elementTransform)
-    }
-
-    if (transform) {
-      commands = transformCommands(
-        commands,
-        transform.scale,
-        transform.tx,
-        transform.ty,
-      )
-      style.strokeWidth *= transform.scale
-    }
-
-    renderPath(graphics, commands, style, options)
-  }
-
-  applyMsaaIfNeeded(graphics, options?.msaaSamples)
+  renderCompiledItems(graphics, compiled, options)
+  applyMsaaIfNeeded(graphics, compiledMsaaSamples)
   commitDirtyState(graphics, stateKey)
   return true
 }
@@ -277,28 +184,7 @@ function drawCompiledSVGInternal(
 
   applyGraphicsCrispDefaults(graphics)
 
-  const transform = computeTransform(compiled.viewBox, options)
-  const overrideFill = options?.overrideFill
-  const overrideStroke = options?.overrideStroke
-  const hasOverrides =
-    overrideFill !== undefined || overrideStroke !== undefined
-
-  const items = compiled.items
-  const sourceItems = transform
-    ? getTransformedItems(compiled, transform)
-    : items
-
-  for (const item of sourceItems) {
-    const style = hasOverrides
-      ? applyStyleOverrides(item.style, overrideFill, overrideStroke)
-      : item.style
-
-    if (item.kind === "native") {
-      drawNativeShape(graphics, item.shape, style)
-    } else {
-      renderPath(graphics, item.commands, style, options)
-    }
-  }
+  renderCompiledItems(graphics, compiled, options)
 
   applyMsaaIfNeeded(graphics, compiledMsaaSamples)
   commitDirtyState(graphics, stateKey)
@@ -401,6 +287,34 @@ function getTransformedItems(
   return scaledItems
 }
 
+function renderCompiledItems(
+  graphics: GameObjects.Graphics,
+  compiled: CompiledSVG,
+  options?: SVGPluginOptions | undefined,
+): void {
+  const transform = computeTransform(compiled.viewBox, options)
+  const overrideFill = options?.overrideFill
+  const overrideStroke = options?.overrideStroke
+  const hasOverrides =
+    overrideFill !== undefined || overrideStroke !== undefined
+
+  const sourceItems = transform
+    ? getTransformedItems(compiled, transform)
+    : compiled.items
+
+  for (const item of sourceItems) {
+    const style = hasOverrides
+      ? applyStyleOverrides(item.style, overrideFill, overrideStroke)
+      : item.style
+
+    if (item.kind === "native") {
+      drawNativeShape(graphics, item.shape, style)
+    } else {
+      renderPath(graphics, item.commands, style, options)
+    }
+  }
+}
+
 function scaleStyleStroke(style: SVGStyle, scale: number): SVGStyle {
   if (scale === 1) {
     return style
@@ -418,6 +332,27 @@ function transformKey(transform: {
   ty: number
 }): string {
   return `${transform.scale}|${transform.tx}|${transform.ty}`
+}
+
+function getRuntimeCompiledSVG(svgString: string): CompiledSVG {
+  const cached = runtimeCompiledCache.get(svgString)
+  if (cached) {
+    runtimeCompiledCache.delete(svgString)
+    runtimeCompiledCache.set(svgString, cached)
+    return cached
+  }
+
+  const compiled = compileSVG(svgString)
+
+  if (runtimeCompiledCache.size >= RUNTIME_COMPILED_CACHE_MAX_ENTRIES) {
+    const oldestKey = runtimeCompiledCache.keys().next().value
+    if (oldestKey !== undefined) {
+      runtimeCompiledCache.delete(oldestKey)
+    }
+  }
+
+  runtimeCompiledCache.set(svgString, compiled)
+  return compiled
 }
 
 interface PhaserRendererLike {
@@ -494,30 +429,6 @@ function resolveStyleWithOverrides(
   }
 }
 
-function parseViewBox(raw: string | null | undefined): ViewBox | undefined {
-  if (!raw) return undefined
-  const parts = raw.trim().split(/[\s,]+/)
-  if (parts.length !== 4) return undefined
-
-  const minX = Number(parts[0])
-  const minY = Number(parts[1])
-  const width = Number(parts[2])
-  const height = Number(parts[3])
-
-  if (
-    !Number.isFinite(minX) ||
-    !Number.isFinite(minY) ||
-    !Number.isFinite(width) ||
-    !Number.isFinite(height) ||
-    width <= 0 ||
-    height <= 0
-  ) {
-    return undefined
-  }
-
-  return { minX, minY, width, height }
-}
-
 function computeTransform(
   viewBox: ViewBox | null | undefined,
   options: SVGPluginOptions | undefined,
@@ -545,23 +456,13 @@ function compiledIdentity(compiled: CompiledSVG): number {
   return created
 }
 
-function pluginOptionsStateKey(options: SVGPluginOptions | undefined): string {
-  return [
-    options?.curveResolution,
-    options?.overrideFill,
-    options?.overrideStroke,
-    options?.width,
-    options?.height,
-    options?.msaaSamples ?? 4,
-  ].join("|")
-}
-
 function compiledOptionsStateKey(
   options: SVGPluginOptions | undefined,
   resolvedMsaaSamples: MsaaSamples,
 ): string {
   return [
     options?.curveResolution,
+    options?.curveTolerance,
     options?.overrideFill,
     options?.overrideStroke,
     options?.width,
@@ -578,7 +479,11 @@ function resolveCompiledMsaaSamples(
 }
 
 function pathOptionsStateKey(options: SVGPathOptions | undefined): string {
-  return [options?.curveResolution, options?.msaaSamples ?? 4].join("|")
+  return [
+    options?.curveResolution,
+    options?.curveTolerance,
+    options?.msaaSamples ?? 4,
+  ].join("|")
 }
 
 function styleStateKey(style: Partial<SVGStyle> | undefined): string {

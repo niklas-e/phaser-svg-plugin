@@ -207,7 +207,7 @@ describe("compileSVG", () => {
     const result = compileSVG(svg)
     assert.equal(result.items.length, 1)
 
-  const path = pathItemAt(result)
+    const path = pathItemAt(result)
     const move = assertDefined(path.commands[0])
     assert.equal(move.type, "M")
     assert.ok(Math.abs(move.x - 19) < 0.001)
@@ -226,6 +226,56 @@ describe("compileSVG", () => {
     assert.equal(item.style.fill, null)
     assert.equal(item.style.stroke, 0x3e2400)
     assert.equal(item.style.strokeWidth, 15)
+  })
+
+  it("inherits nested group presentation attributes", () => {
+    const svg = `<svg>
+      <g fill="#ff0000" stroke="#00ff00" stroke-width="4">
+        <g fill-opacity="0.5">
+          <rect width="10" height="6" />
+        </g>
+      </g>
+    </svg>`
+
+    const result = compileSVG(svg)
+    const item = pathItemAt(result)
+
+    assert.equal(item.style.fill, 0xff0000)
+    assert.equal(item.style.fillAlpha, 0.5)
+    assert.equal(item.style.stroke, 0x00ff00)
+    assert.equal(item.style.strokeWidth, 4)
+  })
+
+  it("accumulates nested group transforms before compiling geometry", () => {
+    const svg = `<svg>
+      <g transform="translate(5 7)">
+        <g transform="scale(2)">
+          <rect x="1" y="2" width="3" height="4" />
+        </g>
+      </g>
+    </svg>`
+
+    const result = compileSVG(svg)
+
+    assert.deepStrictEqual(pathItemAt(result).commands, [
+      { type: "M", x: 7, y: 11 },
+      { type: "L", x: 13, y: 11 },
+      { type: "L", x: 13, y: 19 },
+      { type: "L", x: 7, y: 19 },
+      { type: "Z" },
+    ])
+  })
+
+  it("multiplies container opacity into leaf style opacity", () => {
+    const svg = `<svg opacity="0.5">
+      <g opacity="0.25">
+        <path d="M 0 0 L 10 0" stroke="#ffffff" />
+      </g>
+    </svg>`
+
+    const result = compileSVG(svg)
+
+    assert.equal(pathItemAt(result).style.opacity, 0.125)
   })
 
   it("ignores helper geometry from defs/clipPath", () => {
@@ -295,7 +345,7 @@ describe("compileSVG", () => {
     </svg>`
 
     const result = compileSVG(svg)
-  const commands = pathItemAt(result).commands
+    const commands = pathItemAt(result).commands
     const move = assertDefined(commands[0])
 
     assert.equal(move.type, "M")
