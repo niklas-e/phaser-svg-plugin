@@ -3,6 +3,24 @@ import assert from "node:assert/strict"
 import { assertDefined } from "./assert.ts"
 import { compileSVG } from "./compiler.ts"
 
+function pathItemAt(
+  result: ReturnType<typeof compileSVG>,
+  index = 0,
+): Extract<(typeof result.items)[number], { kind: "path" }> {
+  const item = assertDefined(result.items[index])
+  assert.equal(item.kind, "path")
+  return item
+}
+
+function nativeItemAt(
+  result: ReturnType<typeof compileSVG>,
+  index = 0,
+): Extract<(typeof result.items)[number], { kind: "native" }> {
+  const item = assertDefined(result.items[index])
+  assert.equal(item.kind, "native")
+  return item
+}
+
 describe("compileSVG", () => {
   it("does not set msaaSamples when compile options are omitted", () => {
     const svg = `<svg><path d="M 0 0 L 1 1" /></svg>`
@@ -22,8 +40,8 @@ describe("compileSVG", () => {
     const svg = `<svg><path d="M 0 0 L 100 100" fill="red" stroke="blue" stroke-width="2" /></svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 1)
-    const path = assertDefined(result.paths[0])
+    assert.equal(result.items.length, 1)
+    const path = pathItemAt(result)
     assert.equal(path.commands.length, 2)
     assert.deepStrictEqual(path.commands[0], { type: "M", x: 0, y: 0 })
     assert.deepStrictEqual(path.commands[1], { type: "L", x: 100, y: 100 })
@@ -39,27 +57,27 @@ describe("compileSVG", () => {
     </svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 2)
-    assert.equal(assertDefined(result.paths[0]).commands.length, 3)
-    assert.equal(assertDefined(result.paths[1]).commands.length, 2)
-    assert.equal(assertDefined(result.paths[0]).style.fill, 0x00bcd4)
-    assert.equal(assertDefined(result.paths[1]).style.fill, null)
-    assert.equal(assertDefined(result.paths[1]).style.stroke, 0xffffff)
+    assert.equal(result.items.length, 2)
+    assert.equal(pathItemAt(result, 0).commands.length, 3)
+    assert.equal(pathItemAt(result, 1).commands.length, 2)
+    assert.equal(pathItemAt(result, 0).style.fill, 0x00bcd4)
+    assert.equal(pathItemAt(result, 1).style.fill, null)
+    assert.equal(pathItemAt(result, 1).style.stroke, 0xffffff)
   })
 
   it("skips path elements without a d attribute", () => {
     const svg = `<svg><path fill="red" /><path d="M 0 0 L 1 1" /></svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 1)
+    assert.equal(result.items.length, 1)
   })
 
   it("handles single-quoted attributes", () => {
     const svg = `<svg><path d='M 0 0 L 50 50' fill='#ff0000' /></svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 1)
-    assert.equal(assertDefined(result.paths[0]).style.fill, 0xff0000)
+    assert.equal(result.items.length, 1)
+    assert.equal(pathItemAt(result).style.fill, 0xff0000)
   })
 
   it("handles multi-line path elements", () => {
@@ -74,10 +92,10 @@ describe("compileSVG", () => {
     </svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 1)
-    assert.equal(assertDefined(result.paths[0]).style.fill, 0xe91e63)
-    assert.equal(assertDefined(result.paths[0]).style.fillAlpha, 0.9)
-    assert.equal(assertDefined(result.paths[0]).style.stroke, 0xffffff)
+    assert.equal(result.items.length, 1)
+    assert.equal(pathItemAt(result).style.fill, 0xe91e63)
+    assert.equal(pathItemAt(result).style.fillAlpha, 0.9)
+    assert.equal(pathItemAt(result).style.stroke, 0xffffff)
   })
 
   it("resolves all style properties", () => {
@@ -90,7 +108,7 @@ describe("compileSVG", () => {
     /></svg>`
     const result = compileSVG(svg)
 
-    const style = assertDefined(result.paths[0]).style
+    const style = pathItemAt(result).style
     assert.equal(style.fill, 0x000000)
     assert.equal(style.fillAlpha, 0.5)
     assert.equal(style.stroke, 0xffffff)
@@ -106,7 +124,6 @@ describe("compileSVG", () => {
     const svg = `<svg><g><defs /></g></svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 0)
     assert.equal(result.items.length, 0)
   })
 
@@ -114,8 +131,8 @@ describe("compileSVG", () => {
     const svg = `<svg><line x1="2" y1="4" x2="12" y2="18" stroke="#ffffff" /></svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 1)
-    const commands = assertDefined(result.paths[0]).commands
+    assert.equal(result.items.length, 1)
+    const commands = pathItemAt(result).commands
     assert.deepStrictEqual(commands, [
       { type: "M", x: 2, y: 4 },
       { type: "L", x: 12, y: 18 },
@@ -126,8 +143,8 @@ describe("compileSVG", () => {
     const svg = `<svg><polyline points="0,0 10,5 20,0" stroke="#ffffff" /></svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 1)
-    const commands = assertDefined(result.paths[0]).commands
+    assert.equal(result.items.length, 1)
+    const commands = pathItemAt(result).commands
     assert.deepStrictEqual(commands, [
       { type: "M", x: 0, y: 0 },
       { type: "L", x: 10, y: 5 },
@@ -139,8 +156,8 @@ describe("compileSVG", () => {
     const svg = `<svg><polygon points="5,5 15,5 15,15 5,15" fill="#ffaa00" /></svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 1)
-    const commands = assertDefined(result.paths[0]).commands
+    assert.equal(result.items.length, 1)
+    const commands = pathItemAt(result).commands
     assert.deepStrictEqual(commands, [
       { type: "M", x: 5, y: 5 },
       { type: "L", x: 15, y: 5 },
@@ -148,58 +165,38 @@ describe("compileSVG", () => {
       { type: "L", x: 5, y: 15 },
       { type: "Z" },
     ])
-    assert.equal(assertDefined(result.paths[0]).style.fill, 0xffaa00)
+    assert.equal(pathItemAt(result).style.fill, 0xffaa00)
   })
 
   it("compiles circle elements", () => {
     const svg = `<svg><circle cx="12" cy="18" r="6" fill="#ff00ff" /></svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 1)
-    const commands = assertDefined(result.paths[0]).commands
-    assert.equal(assertDefined(commands[0]).type, "M")
-    assert.equal(assertDefined(commands[1]).type, "A")
-    assert.equal(assertDefined(commands[2]).type, "A")
-    assert.equal(assertDefined(commands[3]).type, "Z")
-    assert.equal(assertDefined(result.paths[0]).style.fill, 0xff00ff)
-
     assert.equal(result.items.length, 1)
-    const item = assertDefined(result.items[0])
-    assert.equal(item.kind, "native")
-    if (item.kind === "native") {
-      assert.deepStrictEqual(item.shape, {
-        kind: "circle",
-        cx: 12,
-        cy: 18,
-        r: 6,
-      })
-    }
+    const item = nativeItemAt(result)
+    assert.equal(item.style.fill, 0xff00ff)
+    assert.deepStrictEqual(item.shape, {
+      kind: "circle",
+      cx: 12,
+      cy: 18,
+      r: 6,
+    })
   })
 
   it("compiles ellipse elements", () => {
     const svg = `<svg><ellipse cx="20" cy="14" rx="8" ry="4" fill="#00ffff" /></svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 1)
-    const commands = assertDefined(result.paths[0]).commands
-    assert.equal(assertDefined(commands[0]).type, "M")
-    assert.equal(assertDefined(commands[1]).type, "A")
-    assert.equal(assertDefined(commands[2]).type, "A")
-    assert.equal(assertDefined(commands[3]).type, "Z")
-    assert.equal(assertDefined(result.paths[0]).style.fill, 0x00ffff)
-
     assert.equal(result.items.length, 1)
-    const item = assertDefined(result.items[0])
-    assert.equal(item.kind, "native")
-    if (item.kind === "native") {
-      assert.deepStrictEqual(item.shape, {
-        kind: "ellipse",
-        cx: 20,
-        cy: 14,
-        rx: 8,
-        ry: 4,
-      })
-    }
+    const item = nativeItemAt(result)
+    assert.equal(item.style.fill, 0x00ffff)
+    assert.deepStrictEqual(item.shape, {
+      kind: "ellipse",
+      cx: 20,
+      cy: 14,
+      rx: 8,
+      ry: 4,
+    })
   })
 
   it("applies element transform to circle geometry", () => {
@@ -208,10 +205,9 @@ describe("compileSVG", () => {
     </svg>`
 
     const result = compileSVG(svg)
-    assert.equal(result.paths.length, 1)
     assert.equal(result.items.length, 1)
 
-    const path = assertDefined(result.paths[0])
+  const path = pathItemAt(result)
     const move = assertDefined(path.commands[0])
     assert.equal(move.type, "M")
     assert.ok(Math.abs(move.x - 19) < 0.001)
@@ -225,16 +221,11 @@ describe("compileSVG", () => {
     const svg = `<svg fill="none"><circle cx="33.5" cy="33.5" r="26" stroke="#3E2400" stroke-width="15" /></svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 1)
-    const path = assertDefined(result.paths[0])
-    assert.equal(path.style.fill, null)
-    assert.equal(path.style.stroke, 0x3e2400)
-    assert.equal(path.style.strokeWidth, 15)
-
     assert.equal(result.items.length, 1)
-    const item = assertDefined(result.items[0])
+    const item = nativeItemAt(result)
     assert.equal(item.style.fill, null)
     assert.equal(item.style.stroke, 0x3e2400)
+    assert.equal(item.style.strokeWidth, 15)
   })
 
   it("ignores helper geometry from defs/clipPath", () => {
@@ -252,11 +243,9 @@ describe("compileSVG", () => {
     const result = compileSVG(svg)
 
     // Only the visible circle should be compiled.
-    assert.equal(result.paths.length, 1)
     assert.equal(result.items.length, 1)
 
-    const item = assertDefined(result.items[0])
-    assert.equal(item.kind, "native")
+    const item = nativeItemAt(result)
     assert.equal(item.style.fill, 0xff0000)
   })
 
@@ -264,8 +253,8 @@ describe("compileSVG", () => {
     const svg = `<svg><rect x="10" y="20" width="30" height="40" fill="#00ff00" /></svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 1)
-    const path = assertDefined(result.paths[0])
+    assert.equal(result.items.length, 1)
+    const path = pathItemAt(result)
     assert.deepStrictEqual(path.commands, [
       { type: "M", x: 10, y: 20 },
       { type: "L", x: 40, y: 20 },
@@ -280,8 +269,8 @@ describe("compileSVG", () => {
     const svg = `<svg><rect width="20" height="10" rx="4" ry="2" /></svg>`
     const result = compileSVG(svg)
 
-    assert.equal(result.paths.length, 1)
-    const commands = assertDefined(result.paths[0]).commands
+    assert.equal(result.items.length, 1)
+    const commands = pathItemAt(result).commands
     assert.equal(assertDefined(commands[0]).type, "M")
     assert.equal(assertDefined(commands[2]).type, "A")
     assert.equal(assertDefined(commands[4]).type, "A")
@@ -306,7 +295,7 @@ describe("compileSVG", () => {
     </svg>`
 
     const result = compileSVG(svg)
-    const commands = assertDefined(result.paths[0]).commands
+  const commands = pathItemAt(result).commands
     const move = assertDefined(commands[0])
 
     assert.equal(move.type, "M")
@@ -314,9 +303,8 @@ describe("compileSVG", () => {
     assert.ok(Math.abs(move.y - 92.816) < 0.02)
   })
 
-  it("returns empty paths for empty string", () => {
+  it("returns empty items for empty string", () => {
     const result = compileSVG("")
-    assert.equal(result.paths.length, 0)
     assert.equal(result.items.length, 0)
   })
 
@@ -358,7 +346,6 @@ describe("compileSVG", () => {
 
     assert.deepStrictEqual(restored.viewBox, compiled.viewBox)
     assert.deepStrictEqual(restored.items, compiled.items)
-    assert.deepStrictEqual(restored.paths, compiled.paths)
 
     if (compiled.msaaSamples === undefined) {
       assert.equal("msaaSamples" in restored, false)

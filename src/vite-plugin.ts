@@ -3,7 +3,7 @@ import type { Plugin } from "vite"
 import { compileSVG } from "./compiler.ts"
 import type { MsaaSamples } from "./render-node/types.ts"
 
-export type { CompiledItem, CompiledPath, CompiledSVG } from "./compiler.ts"
+export type { CompiledItem, CompiledSVG } from "./compiler.ts"
 
 export interface PhaserSVGViteOptions {
   /**

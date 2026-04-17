@@ -4,7 +4,7 @@ import {
   strokeScaleFromAffine,
   transformPathCommandsAffine,
 } from "./affine-transform.ts"
-import type { CompiledItem, CompiledPath, CompiledSVG } from "./compiler.ts"
+import type { CompiledItem, CompiledSVG } from "./compiler.ts"
 import {
   drawNativeShape,
   parseNativeShape,
@@ -54,10 +54,6 @@ export interface SVGPluginOptions extends RenderOptions {
 const transformedItemCache = new WeakMap<
   CompiledSVG,
   Map<string, ReadonlyArray<CompiledItem>>
->()
-const transformedPathCache = new WeakMap<
-  CompiledSVG,
-  Map<string, ReadonlyArray<CompiledPath>>
 >()
 const styleOverrideCache = new WeakMap<SVGStyle, Map<string, SVGStyle>>()
 const compiledIdentityByRef = new WeakMap<CompiledSVG, number>()
@@ -288,38 +284,18 @@ function drawCompiledSVGInternal(
     overrideFill !== undefined || overrideStroke !== undefined
 
   const items = compiled.items
-  if (Array.isArray(items) && items.length > 0) {
-    const sourceItems = transform
-      ? getTransformedItems(compiled, transform)
-      : items
+  const sourceItems = transform ? getTransformedItems(compiled, transform) : items
 
-    for (const item of sourceItems) {
-      const style = hasOverrides
-        ? applyStyleOverrides(item.style, overrideFill, overrideStroke)
-        : item.style
-
-      if (item.kind === "native") {
-        drawNativeShape(graphics, item.shape, style)
-      } else {
-        renderPath(graphics, item.commands, style, options)
-      }
-    }
-
-    applyMsaaIfNeeded(graphics, compiledMsaaSamples)
-    commitDirtyState(graphics, stateKey)
-    return true
-  }
-
-  const sourcePaths = transform
-    ? getTransformedPaths(compiled, transform)
-    : compiled.paths
-
-  for (const path of sourcePaths) {
+  for (const item of sourceItems) {
     const style = hasOverrides
-      ? applyStyleOverrides(path.style, overrideFill, overrideStroke)
-      : path.style
+      ? applyStyleOverrides(item.style, overrideFill, overrideStroke)
+      : item.style
 
-    renderPath(graphics, path.commands, style, options)
+    if (item.kind === "native") {
+      drawNativeShape(graphics, item.shape, style)
+    } else {
+      renderPath(graphics, item.commands, style, options)
+    }
   }
 
   applyMsaaIfNeeded(graphics, compiledMsaaSamples)
@@ -421,36 +397,6 @@ function getTransformedItems(
 
   byTransform.set(key, scaledItems)
   return scaledItems
-}
-
-function getTransformedPaths(
-  compiled: CompiledSVG,
-  transform: { scale: number; tx: number; ty: number },
-): ReadonlyArray<CompiledPath> {
-  let byTransform = transformedPathCache.get(compiled)
-  if (!byTransform) {
-    byTransform = new Map<string, ReadonlyArray<CompiledPath>>()
-    transformedPathCache.set(compiled, byTransform)
-  }
-
-  const key = transformKey(transform)
-  const cached = byTransform.get(key)
-  if (cached) {
-    return cached
-  }
-
-  const scaledPaths = compiled.paths.map((path) => ({
-    commands: transformCommands(
-      path.commands,
-      transform.scale,
-      transform.tx,
-      transform.ty,
-    ),
-    style: scaleStyleStroke(path.style, transform.scale),
-  }))
-
-  byTransform.set(key, scaledPaths)
-  return scaledPaths
 }
 
 function scaleStyleStroke(style: SVGStyle, scale: number): SVGStyle {

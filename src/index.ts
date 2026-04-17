@@ -3,7 +3,6 @@ export {
   compileSVG,
   type CompileSVGOptions,
   type CompiledItem,
-  type CompiledPath,
   type CompiledSVG,
 } from "./compiler.ts"
 export {

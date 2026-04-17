@@ -187,7 +187,6 @@ describe("MSAA default x4 behavior", () => {
           style: DEFAULT_STYLE,
         },
       ],
-      paths: [],
     }
 
     const graphics = asGraphics(new GraphicsWithoutRenderer())
@@ -216,7 +215,6 @@ describe("MSAA default x4 behavior", () => {
             },
           },
         ],
-        paths: [],
       }
 
       const first = drawCompiledSVGIfDirty(graphics, compiled)

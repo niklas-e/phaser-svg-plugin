@@ -19,12 +19,6 @@ export interface CompileSVGOptions {
   msaaSamples?: MsaaSamples | undefined
 }
 
-/** A pre-compiled SVG path: parsed commands with resolved style. */
-export interface CompiledPath {
-  commands: PathCommand[]
-  style: SVGStyle
-}
-
 /** A pre-compiled shape item that preserves source draw order. */
 export type CompiledItem =
   | { kind: "path"; commands: PathCommand[]; style: SVGStyle }
@@ -37,8 +31,6 @@ export interface CompiledSVG {
   msaaSamples?: MsaaSamples | undefined
   /** Ordered shape list used by the renderer. */
   items: CompiledItem[]
-  /** Backward-compatible path list (all shapes converted to paths). */
-  paths: CompiledPath[]
 }
 
 /**
@@ -55,7 +47,6 @@ export function compileSVG(
   const viewBox = extractViewBox(svgString) ?? null
   const inheritedStyleAttrs = extractSVGPresentationAttrs(svgString)
   const elements = extractShapeElements(stripNonRenderableSections(svgString))
-  const paths: CompiledPath[] = []
   const items: CompiledItem[] = []
 
   for (const { tagName, attrs } of elements) {
@@ -73,8 +64,6 @@ export function compileSVG(
       style.strokeWidth *= strokeScaleFromAffine(elementTransform)
     }
 
-    paths.push({ commands, style })
-
     if (nativeShape && !elementTransform) {
       items.push({ kind: "native", shape: nativeShape, style })
     } else {
@@ -82,7 +71,7 @@ export function compileSVG(
     }
   }
 
-  return { viewBox, msaaSamples: options?.msaaSamples, items, paths }
+  return { viewBox, msaaSamples: options?.msaaSamples, items }
 }
 
 /**

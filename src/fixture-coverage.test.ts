@@ -18,7 +18,7 @@ describe("svg fixture coverage", () => {
       const compiled = compileSVG(raw)
 
       assert.ok(
-        compiled.items.length > 0 || compiled.paths.length > 0,
+        compiled.items.length > 0,
         `Expected at least one compiled shape in fixture ${file}`,
       )
     }
