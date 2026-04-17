@@ -873,9 +873,14 @@ function getLineJoinDecorations(
       const next = assertDefined(points[(i + 1) % n])
 
       if (style.lineJoin === "round") {
+        const bevel = computeBevelJoin(prev, curr, next, hw)
+        if (!bevel) {
+          continue
+        }
+
         ops.push({
           kind: "polygon",
-          points: createRoundDisk(curr, hw),
+          points: createRoundJoinSector(curr, bevel[0], bevel[1], hw),
         })
       } else if (style.lineJoin === "bevel") {
         const bevel = computeBevelJoin(prev, curr, next, hw)
@@ -901,14 +906,16 @@ function getLineJoinDecorations(
   if (!closed && n >= 2) {
     if (style.lineCap === "round") {
       const first = assertDefined(points[0])
+      const second = assertDefined(points[1])
       const last = assertDefined(points[n - 1])
+      const secondLast = assertDefined(points[n - 2])
       ops.push({
         kind: "polygon",
-        points: createRoundDisk(first, hw),
+        points: createRoundCapPolygon(first, second, hw, true),
       })
       ops.push({
         kind: "polygon",
-        points: createRoundDisk(last, hw),
+        points: createRoundCapPolygon(last, secondLast, hw, false),
       })
     } else if (style.lineCap === "square") {
       const first = assertDefined(points[0])
@@ -1017,24 +1024,72 @@ function fillPolygon(
   }
 }
 
-function createRoundDisk(center: Point2D, radius: number): Point2D[] {
-  const segments = resolveRoundSegments(radius)
+function createRoundJoinSector(
+  center: Point2D,
+  a: Point2D,
+  b: Point2D,
+  radius: number,
+): Point2D[] {
+  const a0 = Math.atan2(a.y - center.y, a.x - center.x)
+  const a1 = Math.atan2(b.y - center.y, b.x - center.x)
+  const delta = shortestAngleDelta(a0, a1)
+  const arc = sampleArc(center, radius, a0, a0 + delta)
+  return [center, ...arc]
+}
+
+function createRoundCapPolygon(
+  endpoint: Point2D,
+  neighbour: Point2D,
+  radius: number,
+  isStart: boolean,
+): Point2D[] {
+  const dx = neighbour.x - endpoint.x
+  const dy = neighbour.y - endpoint.y
+  const len = Math.hypot(dx, dy)
+  if (len === 0) {
+    return []
+  }
+
+  const tx = dx / len
+  const ty = dy / len
+  const dirX = isStart ? -tx : tx
+  const dirY = isStart ? -ty : ty
+  const base = Math.atan2(dirY, dirX)
+  return sampleArc(endpoint, radius, base - Math.PI / 2, base + Math.PI / 2)
+}
+
+function sampleArc(
+  center: Point2D,
+  radius: number,
+  startAngle: number,
+  endAngle: number,
+): Point2D[] {
+  const sweep = endAngle - startAngle
+  const circumference = Math.max(1, Math.abs(sweep) * radius)
+  const segments = clamp(Math.ceil(circumference / 2), 6, 48)
   const points: Point2D[] = []
 
-  for (let i = 0; i < segments; i++) {
-    const theta = (i / segments) * Math.PI * 2
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments
+    const angle = startAngle + sweep * t
     points.push({
-      x: center.x + Math.cos(theta) * radius,
-      y: center.y + Math.sin(theta) * radius,
+      x: center.x + Math.cos(angle) * radius,
+      y: center.y + Math.sin(angle) * radius,
     })
   }
 
   return points
 }
 
-function resolveRoundSegments(radius: number): number {
-  const circumference = Math.max(1, 2 * Math.PI * radius)
-  return clamp(Math.ceil(circumference / 2), 12, 48)
+function shortestAngleDelta(from: number, to: number): number {
+  let delta = to - from
+  while (delta > Math.PI) {
+    delta -= Math.PI * 2
+  }
+  while (delta < -Math.PI) {
+    delta += Math.PI * 2
+  }
+  return delta
 }
 
 function clamp(value: number, min: number, max: number): number {
