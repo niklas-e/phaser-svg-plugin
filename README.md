@@ -268,7 +268,7 @@ this.svg.setDefaults({
 
 | Property | Type | Description |
 | --- | --- | --- |
-| `curveTolerance` | `number` | Maximum screen-space curve flattening error. Default is `0.25` for quality-first adaptive tessellation. |
+| `curveTolerance` | `number` | Maximum screen-space curve flattening error. Default is `0.125` for quality-first adaptive tessellation. |
 | `curveResolution` | `number` | Optional fixed points-per-curve override when you need deterministic legacy tessellation. |
 | `overrideFill` | `number` | Force fill colour for all shapes |
 | `overrideStroke` | `number` | Force stroke colour for all shapes |

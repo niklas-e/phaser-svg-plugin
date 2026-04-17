@@ -308,7 +308,9 @@ function renderCompiledItems(
       : item.style
 
     if (item.kind === "native") {
-      drawNativeShape(graphics, item.shape, style)
+      drawNativeShape(graphics, item.shape, style, {
+        curveTolerance: options?.curveTolerance,
+      })
     } else {
       renderPath(graphics, item.commands, style, options)
     }

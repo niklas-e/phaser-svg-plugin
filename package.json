@@ -64,6 +64,6 @@
   "dependencies": {
     "earcut": "^3.0.2",
     "fast-xml-parser": "^5.6.0",
-    "libtess": "^1.2.2"
+    "libtess-ts": "^0.0.1"
   }
 }

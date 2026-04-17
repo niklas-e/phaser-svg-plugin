@@ -4,13 +4,13 @@ interface RendererConfigLike {
   pathDetailThreshold?: number | undefined
 }
 
-const DEFAULT_CURVE_TOLERANCE = 0.25
+export const DEFAULT_CURVE_TOLERANCE = 0.125
 
 /**
  * Resolve the effective curve flattening tolerance.
  *
  * Explicit `curveTolerance` wins.
- * Otherwise, the renderer defaults to a quarter-pixel screen-space error.
+ * Otherwise, the renderer defaults to an eighth-pixel screen-space error.
  */
 export function resolveCurveTolerance(
   options?: Pick<RenderOptions, "curveTolerance"> | undefined,

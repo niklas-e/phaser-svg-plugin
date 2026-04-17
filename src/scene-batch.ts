@@ -190,7 +190,9 @@ export class SVGSceneBatch {
             scale === 1 && tx === 0 && ty === 0
               ? item.shape
               : transformNativeShape(item.shape, scale, tx, ty)
-          drawNativeShape(this.graphics, shape, style)
+          drawNativeShape(this.graphics, shape, style, {
+            curveTolerance: options?.curveTolerance,
+          })
         } else {
           const commands =
             scale === 1 && tx === 0 && ty === 0

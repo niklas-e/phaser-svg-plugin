@@ -8,7 +8,7 @@ import {
 
 describe("resolveCurveTolerance", () => {
   it("uses adaptive default tolerance when not provided", () => {
-    assert.equal(resolveCurveTolerance(undefined), 0.25)
+    assert.equal(resolveCurveTolerance(undefined), 0.125)
   })
 
   it("prefers explicit curveTolerance", () => {

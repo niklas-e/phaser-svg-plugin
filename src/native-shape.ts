@@ -1,4 +1,5 @@
 import type { GameObjects } from "phaser"
+import { DEFAULT_CURVE_TOLERANCE } from "./quality.ts"
 import type { SVGStyle } from "./types.ts"
 
 export type NativeShape =
@@ -6,6 +7,10 @@ export type NativeShape =
   | { kind: "ellipse"; cx: number; cy: number; rx: number; ry: number }
 
 type EllipsePoint = { x: number; y: number }
+
+interface NativeShapeRenderOptions {
+  curveTolerance?: number | undefined
+}
 
 const ELLIPSE_SAMPLE_CACHE_MAX_ENTRIES = 512
 const ELLIPSE_SAMPLE_CACHE = new Map<string, ReadonlyArray<EllipsePoint>>()
@@ -68,6 +73,7 @@ export function drawNativeShape(
   graphics: GameObjects.Graphics,
   shape: NativeShape,
   style: SVGStyle,
+  options?: NativeShapeRenderOptions | undefined,
 ): void {
   const { cx, cy, rx, ry } = getNativeRadii(shape)
   const effectiveFillAlpha =
@@ -77,7 +83,7 @@ export function drawNativeShape(
 
   if (style.fill !== null && effectiveFillAlpha > 0) {
     graphics.fillStyle(style.fill, effectiveFillAlpha)
-    const segments = computeEllipseSegments(rx, ry)
+    const segments = computeEllipseSegments(rx, ry, options?.curveTolerance)
     graphics.fillEllipse(cx, cy, rx * 2, ry * 2, segments)
   }
 
@@ -92,6 +98,7 @@ export function drawNativeShape(
       style.stroke,
       effectiveStrokeAlpha,
       style.strokeWidth,
+      options?.curveTolerance,
     )
   }
 }
@@ -125,6 +132,7 @@ function drawNativeStrokeRing(
   stroke: number,
   strokeAlpha: number,
   strokeWidth: number,
+  curveTolerance?: number | undefined,
 ): void {
   const { cx, cy, rx, ry } = getNativeRadii(shape)
   const halfWidth = strokeWidth / 2
@@ -138,12 +146,12 @@ function drawNativeStrokeRing(
 
   // If stroke covers the center, render as a filled outer ellipse.
   if (innerRx <= 0 || innerRy <= 0) {
-    const segments = computeEllipseSegments(outerRx, outerRy)
+    const segments = computeEllipseSegments(outerRx, outerRy, curveTolerance)
     graphics.fillEllipse(cx, cy, outerRx * 2, outerRy * 2, segments)
     return
   }
 
-  const segments = computeEllipseSegments(outerRx, outerRy)
+  const segments = computeEllipseSegments(outerRx, outerRy, curveTolerance)
   const outer = getSampledEllipse(outerRx, outerRy, segments)
   const inner = getSampledEllipse(innerRx, innerRy, segments)
 
@@ -208,13 +216,17 @@ function getSampledEllipse(
   return points
 }
 
-function computeEllipseSegments(rx: number, ry: number): number {
+function computeEllipseSegments(
+  rx: number,
+  ry: number,
+  curveTolerance = DEFAULT_CURVE_TOLERANCE,
+): number {
   const maxRadius = Math.max(Math.abs(rx), Math.abs(ry))
   if (maxRadius <= 0) {
     return 24
   }
 
-  const tolerance = clamp(0.25, 1e-4, maxRadius)
+  const tolerance = clamp(curveTolerance, 1e-4, maxRadius)
   const ratio = clamp(1 - tolerance / maxRadius, -1, 1)
   const maxAngle = 2 * Math.acos(ratio)
   const safeAngle =
