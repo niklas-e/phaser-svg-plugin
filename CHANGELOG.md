@@ -7,10 +7,18 @@ This project is currently in alpha. During alpha, semver patch releases are inte
 ## [Unreleased]
 
 ### Added
+- `SVGSceneBatch` now caches repeated `queueSVG` compilation and `queuePath`
+	parsing inputs to reduce per-frame queue overhead.
+- `SVGSceneBatch` now supports optional retained-mode dirty skipping via
+	`{ retained: true }`, and exposes `markDirty()` to force the next redraw.
 
 ### Changed
 - Default `msaaSamples` for draw/plugin/scene-batch flows is now `2` (was `4`).
 - `MsaaSamples` now accepts `2 | 4 | 8`, and capability negotiation now supports explicit `x2` requests.
+- Renderer triangle submission now coalesces repeated triangle writes for
+	lower JS overhead on heavy fill/stroke workloads.
+- Performance baseline guidance now includes 64-object immediate vs
+	scene-batch scenarios for batching regression tracking.
 
 ### Fixed
 

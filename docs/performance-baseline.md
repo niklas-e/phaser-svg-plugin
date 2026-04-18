@@ -8,6 +8,8 @@ Track changes over time to detect regressions.
 - First draw cost for precompiled path.
 - Repeated draw cost with unchanged state (dirty-skip path).
 - Repeated draw cost with changed state (clear+redraw path).
+- Multi-object cost when drawing precompiled SVGs immediately (64 objects).
+- Multi-object cost when drawing the same workload through `SVGSceneBatch` (64 objects).
 
 ## Suggested protocol
 
@@ -31,6 +33,11 @@ Use `baselineRows` from the JSON report to fill the table below:
 - `precompiled first draw`
 - `unchanged redraw skip`
 - `dirty redraw clear+draw`
+- `multi-object immediate compiled (64)`
+- `multi-object scene batch compiled (64)`
+
+When validating retained scene-batch usage, also capture whether consecutive
+unchanged flushes were skipped and include that note in the baseline row.
 
 ## Baseline table
 
@@ -40,3 +47,5 @@ Use `baselineRows` from the JSON report to fill the table below:
 | 2026-04-06 | 0.1.0 | precompiled first draw | TBD | |
 | 2026-04-06 | 0.1.0 | unchanged redraw skip | TBD | |
 | 2026-04-06 | 0.1.0 | dirty redraw clear+draw | TBD | |
+| 2026-04-06 | 0.1.0 | multi-object immediate compiled (64) | TBD | |
+| 2026-04-06 | 0.1.0 | multi-object scene batch compiled (64) | TBD | |
