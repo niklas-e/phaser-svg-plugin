@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
+import { assertDefined } from "./assert.ts"
 import { SVGSceneBatch } from "./scene-batch.ts"
 
 class FakeWebGL2Context {
@@ -162,6 +163,62 @@ function createScene(
 }
 
 describe("SVGSceneBatch", () => {
+  it("reuses compiled output for identical queueSVG inputs", () => {
+    const graphics = new FakeGraphics()
+    const scene = createScene(graphics)
+    const batch = new SVGSceneBatch(scene, {
+      graphics: graphics as unknown as Phaser.GameObjects.Graphics,
+      autoFlush: false,
+    })
+
+    const svg =
+      "<svg viewBox='0 0 10 10'><rect x='0' y='0' width='10' height='10'/></svg>"
+
+    batch.queueSVG(svg)
+    batch.queueSVG(svg)
+
+    const queue = (
+      batch as unknown as {
+        queue: Array<{ kind: string; compiled?: unknown }>
+      }
+    ).queue
+
+    assert.equal(queue.length, 2)
+    assert.equal(assertDefined(queue[0]).kind, "compiled")
+    assert.equal(assertDefined(queue[1]).kind, "compiled")
+    assert.equal(
+      assertDefined(queue[0]).compiled,
+      assertDefined(queue[1]).compiled,
+    )
+  })
+
+  it("reuses parsed commands for identical queuePath inputs", () => {
+    const graphics = new FakeGraphics()
+    const scene = createScene(graphics)
+    const batch = new SVGSceneBatch(scene, {
+      graphics: graphics as unknown as Phaser.GameObjects.Graphics,
+      autoFlush: false,
+    })
+
+    const d = "M 0 0 L 10 0 L 10 10 Z"
+    batch.queuePath(d, { fill: 0xffffff })
+    batch.queuePath(d, { fill: 0xff0000 })
+
+    const queue = (
+      batch as unknown as {
+        queue: Array<{ kind: string; commands?: unknown }>
+      }
+    ).queue
+
+    assert.equal(queue.length, 2)
+    assert.equal(assertDefined(queue[0]).kind, "path")
+    assert.equal(assertDefined(queue[1]).kind, "path")
+    assert.equal(
+      assertDefined(queue[0]).commands,
+      assertDefined(queue[1]).commands,
+    )
+  })
+
   it("flushes queued compiled draws in one pass", () => {
     withFakeWebGL2Context(() => {
       const graphics = new FakeGraphics()

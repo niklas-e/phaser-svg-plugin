@@ -10,6 +10,9 @@ import { type RenderOptions, renderPath } from "./renderer.ts"
 import { transformCommands, viewBoxTransform } from "./transform.ts"
 import type { SVGStyle, ViewBox } from "./types.ts"
 
+const SCENE_BATCH_COMPILED_CACHE_MAX_ENTRIES = 128
+const SCENE_BATCH_PATH_CACHE_MAX_ENTRIES = 256
+
 export interface SceneBatchDrawOptions extends RenderOptions {
   overrideFill?: number | undefined
   overrideStroke?: number | undefined
@@ -79,6 +82,11 @@ export class SVGSceneBatch {
   private readonly graphics: GameObjects.Graphics
   private readonly autoFlush: boolean
   private readonly queue: QueueEntry[] = []
+  private readonly compiledSvgCache = new Map<string, CompiledSVG>()
+  private readonly parsedPathCache = new Map<
+    string,
+    ReturnType<typeof parsePath>
+  >()
 
   constructor(
     scene: Phaser.Scene,
@@ -114,7 +122,7 @@ export class SVGSceneBatch {
     svgString: string,
     options?: SceneBatchDrawOptions | undefined,
   ): this {
-    return this.queueCompiled(compileSVG(svgString), options)
+    return this.queueCompiled(this.getCachedCompiledSVG(svgString), options)
   }
 
   queuePath(
@@ -124,7 +132,7 @@ export class SVGSceneBatch {
   ): this {
     this.queue.push({
       kind: "path",
-      commands: parsePath(d),
+      commands: this.getCachedPathCommands(d),
       style: resolveStyleWithOverrides(style),
       options,
     })
@@ -230,6 +238,48 @@ export class SVGSceneBatch {
       this.scene.sys.events.off("postupdate", this.flush)
     }
     this.queue.length = 0
+    this.compiledSvgCache.clear()
+    this.parsedPathCache.clear()
+  }
+
+  private getCachedCompiledSVG(svgString: string): CompiledSVG {
+    const cached = this.compiledSvgCache.get(svgString)
+    if (cached) {
+      this.compiledSvgCache.delete(svgString)
+      this.compiledSvgCache.set(svgString, cached)
+      return cached
+    }
+
+    const compiled = compileSVG(svgString)
+    if (this.compiledSvgCache.size >= SCENE_BATCH_COMPILED_CACHE_MAX_ENTRIES) {
+      const oldestKey = this.compiledSvgCache.keys().next().value
+      if (oldestKey !== undefined) {
+        this.compiledSvgCache.delete(oldestKey)
+      }
+    }
+
+    this.compiledSvgCache.set(svgString, compiled)
+    return compiled
+  }
+
+  private getCachedPathCommands(d: string): ReturnType<typeof parsePath> {
+    const cached = this.parsedPathCache.get(d)
+    if (cached) {
+      this.parsedPathCache.delete(d)
+      this.parsedPathCache.set(d, cached)
+      return cached
+    }
+
+    const commands = parsePath(d)
+    if (this.parsedPathCache.size >= SCENE_BATCH_PATH_CACHE_MAX_ENTRIES) {
+      const oldestKey = this.parsedPathCache.keys().next().value
+      if (oldestKey !== undefined) {
+        this.parsedPathCache.delete(oldestKey)
+      }
+    }
+
+    this.parsedPathCache.set(d, commands)
+    return commands
   }
 }
 
