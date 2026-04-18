@@ -1,4 +1,4 @@
-/** Keep only SVG presentation attributes that affect paint/style inheritance. */
+/** Keep only inheritable SVG presentation attributes used by this renderer. */
 export declare function filterPresentationAttrs(attrs: Record<string, string>): Record<string, string>;
 /** Convert element attributes to a plain object map. */
 export declare function attrsFromElement(el: Element): Record<string, string>;

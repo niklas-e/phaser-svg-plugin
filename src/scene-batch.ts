@@ -144,7 +144,7 @@ export class SVGSceneBatch {
       applyCrispPathDetailThreshold(renderer)
     }
 
-    let requestedSamples: MsaaSamples = 4
+    let requestedSamples: MsaaSamples = 2
 
     for (const entry of this.queue) {
       if (entry.kind === "path") {
@@ -156,7 +156,7 @@ export class SVGSceneBatch {
             : transformCommands(entry.commands, 1, tx, ty)
 
         renderPath(this.graphics, commands, entry.style, entry.options)
-        const samples = entry.options?.msaaSamples ?? 4
+        const samples = entry.options?.msaaSamples ?? 2
         requestedSamples = Math.max(requestedSamples, samples) as MsaaSamples
         continue
       }
@@ -241,7 +241,7 @@ function resolveCompiledMsaaSamples(
     return options.msaaSamples
   }
 
-  return compiled.msaaSamples ?? 4
+  return compiled.msaaSamples ?? 2
 }
 
 function resolveStyleWithOverrides(

@@ -188,7 +188,7 @@ function createRendererWithFakeWebGL2(options?: {
   return renderer
 }
 
-describe("MSAA default x4 behavior", () => {
+describe("MSAA default x2 behavior", () => {
   it("drawSVGPath fails loudly when no WebGL renderer exists", () => {
     const graphics = asGraphics(new GraphicsWithoutRenderer())
 

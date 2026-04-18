@@ -12,7 +12,11 @@ export type NativeShape = {
     rx: number;
     ry: number;
 };
+interface NativeShapeRenderOptions {
+    curveTolerance?: number | undefined;
+}
 export declare function parseNativeShape(tagName: string, attrs: Record<string, string>): NativeShape | undefined;
 export declare function transformNativeShape(shape: NativeShape, scale: number, tx: number, ty: number): NativeShape;
-export declare function drawNativeShape(graphics: GameObjects.Graphics, shape: NativeShape, style: SVGStyle): void;
+export declare function drawNativeShape(graphics: GameObjects.Graphics, shape: NativeShape, style: SVGStyle, options?: NativeShapeRenderOptions | undefined): void;
+export {};
 //# sourceMappingURL=native-shape.d.ts.map

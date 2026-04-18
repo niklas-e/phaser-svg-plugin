@@ -8,6 +8,10 @@ import type { MsaaCapabilities } from "./types.ts"
 // ---------------------------------------------------------------------------
 
 describe("computeMsaaMemoryBytes", () => {
+  it("returns correct byte count for 1920x1080 x2", () => {
+    assert.equal(computeMsaaMemoryBytes(1920, 1080, 2), 1920 * 1080 * 4 * 2)
+  })
+
   it("returns correct byte count for 1920x1080 x4", () => {
     assert.equal(computeMsaaMemoryBytes(1920, 1080, 4), 1920 * 1080 * 4 * 4)
   })
@@ -48,6 +52,24 @@ describe("negotiateSamples — x8 path", () => {
   })
 })
 
+describe("negotiateSamples — x2 path", () => {
+  it("returns 2 when x2 is supported and under budget", () => {
+    const result = negotiateSamples(2, makeCaps(8), 100, 100)
+    assert.equal(result, 2)
+  })
+
+  it("throws a descriptive error when hardware max is below 2", () => {
+    assert.throws(
+      () => negotiateSamples(2, makeCaps(0), 100, 100),
+      /less than the minimum required 2/,
+    )
+  })
+
+  it("throws a descriptive error when x2 FBO exceeds 96 MiB memory budget", () => {
+    assert.throws(() => negotiateSamples(2, makeCaps(8), 5000, 5000), /96 MiB/)
+  })
+})
+
 describe("negotiateSamples — x4 path", () => {
   it("returns 4 when x4 is supported and under budget", () => {
     const result = negotiateSamples(4, makeCaps(4), 100, 100)
@@ -84,6 +106,9 @@ describe("negotiateSamples — deterministic for all combos", () => {
     [800, 600],
   ]
   for (const [w, h] of targets) {
+    it(`x2 with caps(8) at ${w}x${h} always returns 2`, () => {
+      assert.equal(negotiateSamples(2, makeCaps(8), w, h), 2)
+    })
     it(`x4 with caps(4) at ${w}x${h} always returns 4`, () => {
       assert.equal(negotiateSamples(4, makeCaps(4), w, h), 4)
     })
@@ -94,6 +119,19 @@ describe("negotiateSamples — deterministic for all combos", () => {
       assert.equal(negotiateSamples(8, makeCaps(4), w, h), 4)
     })
   }
+
+  describe("negotiateSamples — x2 unavailable error message", () => {
+    it("includes WebGL2 and x2 guidance", () => {
+      let msg = ""
+      try {
+        negotiateSamples(2, makeCaps(0), 100, 100)
+      } catch (e) {
+        msg = (e as Error).message
+      }
+      assert.match(msg, /WebGL2/)
+      assert.match(msg, /x2/)
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------

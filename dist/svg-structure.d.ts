@@ -1,3 +1,4 @@
+export declare function isNonRenderableContainerTag(tagName: string): boolean;
 /** True when element is inside a non-renderable SVG definition container. */
 export declare function isInsideNonRenderableContainer(el: Element): boolean;
 /**

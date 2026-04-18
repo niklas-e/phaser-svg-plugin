@@ -29,7 +29,8 @@ export interface SVGPluginOptions extends RenderOptions {
   height?: number | undefined
   /**
    * MSAA sample count for anti-aliasing SVG edges.
-   * - `4` (default): 4x MSAA.
+   * - `2` (default): 2x MSAA.
+   * - `4`: 4x MSAA.
    * - `8`: 8x MSAA — automatically downgrades to x4 when unsupported.
    */
   msaaSamples?: MsaaSamples | undefined
@@ -397,7 +398,7 @@ function applyMsaaIfNeeded(
   graphics: GameObjects.Graphics,
   msaaSamples: MsaaSamples | undefined,
 ): void {
-  const resolvedSamples: MsaaSamples = msaaSamples ?? 4
+  const resolvedSamples: MsaaSamples = msaaSamples ?? 2
   const renderer = graphics.scene?.sys?.game?.renderer as unknown as
     | PhaserRendererForMsaa
     | null
@@ -477,14 +478,14 @@ function resolveCompiledMsaaSamples(
   compiled: CompiledSVG,
   options: SVGPluginOptions | undefined,
 ): MsaaSamples {
-  return options?.msaaSamples ?? compiled.msaaSamples ?? 4
+  return options?.msaaSamples ?? compiled.msaaSamples ?? 2
 }
 
 function pathOptionsStateKey(options: SVGPathOptions | undefined): string {
   return [
     options?.curveResolution,
     options?.curveTolerance,
-    options?.msaaSamples ?? 4,
+    options?.msaaSamples ?? 2,
   ].join("|")
 }
 

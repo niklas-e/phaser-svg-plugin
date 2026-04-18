@@ -274,7 +274,7 @@ this.svg.setDefaults({
 | `height` | `number` | Target output height in the Graphics coordinate space. |
 | `overrideFill` | `number` | Force fill colour for all shapes |
 | `overrideStroke` | `number` | Force stroke colour for all shapes |
-| `msaaSamples` | `4 \| 8` | MSAA sample count. Default is `4` (quality-first). `8` downgrades to `4` when unsupported. |
+| `msaaSamples` | `2 \| 4 \| 8` | MSAA sample count. Default is `2` for lower GPU cost. Use `4` or `8` for higher edge quality. `8` downgrades to `4` when unsupported. |
 
 `width` and `height` should usually be the final logical size you want in your
 scene, such as `96 x 96`. Do not multiply them by `window.devicePixelRatio`

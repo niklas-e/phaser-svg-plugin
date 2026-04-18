@@ -9,6 +9,8 @@ This project is currently in alpha. During alpha, semver patch releases are inte
 ### Added
 
 ### Changed
+- Default `msaaSamples` for draw/plugin/scene-batch flows is now `2` (was `4`).
+- `MsaaSamples` now accepts `2 | 4 | 8`, and capability negotiation now supports explicit `x2` requests.
 
 ### Fixed
 

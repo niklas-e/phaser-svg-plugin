@@ -15,12 +15,13 @@ export declare function detectMsaaCapabilities(renderer: PhaserRendererForCaps):
 /**
  * Negotiate the actual sample count to use given requested samples and capabilities.
  *
- * Negotiation rules (from the fixed plan decisions):
- * 1. x8 request → use x8 when device and memory support it.
- * 2. x8 request but unsupported or over budget → silently downgrade to x4.
- * 3. x4 request → use x4 when device and memory support it.
- * 4. x4 not available hardware-wise → throw with actionable message.
- * 5. x4 memory budget exceeded → throw with actionable message.
+ * Negotiation rules:
+ * 1. x2 request → use x2 when device and memory support it.
+ * 2. x2 not available or over budget → throw with actionable message.
+ * 3. x8 request → use x8 when device and memory support it.
+ * 4. x8 request but unsupported or over budget → silently downgrade to x4.
+ * 5. x4 request (or x8 downgraded) → use x4 when device and memory support it.
+ * 6. x4 not available or over budget → throw with actionable message.
  */
 export declare function negotiateSamples(requested: MsaaSamples, caps: MsaaCapabilities, rendererWidth: number, rendererHeight: number): MsaaSamples;
 /**

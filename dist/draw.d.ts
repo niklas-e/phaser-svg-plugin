@@ -1,5 +1,5 @@
 import type { GameObjects } from "phaser";
-import type { CompiledSVG } from "./compiler.ts";
+import { type CompiledSVG } from "./compiler.ts";
 import { type RenderOptions } from "./renderer.ts";
 import type { MsaaOptions, MsaaSamples } from "./render-node/types.ts";
 import type { SVGStyle } from "./types.ts";
@@ -16,7 +16,8 @@ export interface SVGPluginOptions extends RenderOptions {
     height?: number | undefined;
     /**
      * MSAA sample count for anti-aliasing SVG edges.
-     * - `4` (default): 4x MSAA.
+     * - `2` (default): 2x MSAA.
+     * - `4`: 4x MSAA.
      * - `8`: 8x MSAA — automatically downgrades to x4 when unsupported.
      */
     msaaSamples?: MsaaSamples | undefined;

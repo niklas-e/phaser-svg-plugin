@@ -59,7 +59,7 @@ export {
  * ```
  */
 export class SVGPlugin extends Plugins.ScenePlugin {
-  private defaultOptions: SVGPluginOptions = { msaaSamples: 4 }
+  private defaultOptions: SVGPluginOptions = { msaaSamples: 2 }
   private sceneBatch: SVGSceneBatch | null = null
 
   boot(): void {

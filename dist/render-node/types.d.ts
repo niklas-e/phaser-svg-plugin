@@ -1,10 +1,11 @@
-/** Number of multisample MSAA samples. x4 is the default; x8 is opt-in. */
-export type MsaaSamples = 4 | 8;
+/** Number of multisample MSAA samples. x2 is the default; x4/x8 are opt-in. */
+export type MsaaSamples = 2 | 4 | 8;
 /** MSAA options accepted by all SVG draw and plugin APIs. */
 export interface MsaaOptions {
     /**
      * Number of MSAA samples to use for anti-aliasing SVG rendering.
-     * - `4` (default): 4x MSAA — good quality with moderate GPU cost.
+     * - `2` (default): 2x MSAA — lower quality with minimal GPU cost.
+     * - `4`: 4x MSAA — good quality with moderate GPU cost.
      * - `8`: 8x MSAA — higher quality; automatically downgrades to x4 when
      *   the device or memory budget does not support x8.
      */

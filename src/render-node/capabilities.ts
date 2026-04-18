@@ -45,12 +45,13 @@ export function detectMsaaCapabilities(
 /**
  * Negotiate the actual sample count to use given requested samples and capabilities.
  *
- * Negotiation rules (from the fixed plan decisions):
- * 1. x8 request → use x8 when device and memory support it.
- * 2. x8 request but unsupported or over budget → silently downgrade to x4.
- * 3. x4 request → use x4 when device and memory support it.
- * 4. x4 not available hardware-wise → throw with actionable message.
- * 5. x4 memory budget exceeded → throw with actionable message.
+ * Negotiation rules:
+ * 1. x2 request → use x2 when device and memory support it.
+ * 2. x2 not available or over budget → throw with actionable message.
+ * 3. x8 request → use x8 when device and memory support it.
+ * 4. x8 request but unsupported or over budget → silently downgrade to x4.
+ * 5. x4 request (or x8 downgraded) → use x4 when device and memory support it.
+ * 6. x4 not available or over budget → throw with actionable message.
  */
 export function negotiateSamples(
   requested: MsaaSamples,
@@ -58,6 +59,29 @@ export function negotiateSamples(
   rendererWidth: number,
   rendererHeight: number,
 ): MsaaSamples {
+  if (requested === 2) {
+    const canX2Hardware = caps.maxSamples >= 2
+    if (!canX2Hardware) {
+      throw new Error(
+        `phaser-svg MSAA: device maximum sample count is ${caps.maxSamples}, ` +
+          `which is less than the minimum required 2. ` +
+          `To fix: run with a WebGL2 renderer on hardware that supports at least x2 multisampling.`,
+      )
+    }
+
+    const memX2 = computeMsaaMemoryBytes(rendererWidth, rendererHeight, 2)
+    if (memX2 > MEMORY_BUDGET_BYTES) {
+      const mib = (memX2 / (1024 * 1024)).toFixed(0)
+      throw new Error(
+        `phaser-svg MSAA: the MSAA render target for ${rendererWidth}x${rendererHeight} ` +
+          `at x2 samples would require ${mib} MiB (budget is 96 MiB). ` +
+          `To fix: lower the game canvas size, or split large SVG draws into smaller Graphics objects.`,
+      )
+    }
+
+    return 2
+  }
+
   // x8 with silent downgrade to x4 when needed.
   if (requested === 8) {
     const canX8Hardware = caps.maxSamples >= 8
@@ -68,7 +92,7 @@ export function negotiateSamples(
     // Silently downgrade to x4 and fall through.
   }
 
-  // x4 is the minimum acceptable level.
+  // x4 is the minimum acceptable level for x4 (and downgraded x8) requests.
   const canX4Hardware = caps.maxSamples >= 4
   if (!canX4Hardware) {
     throw new Error(

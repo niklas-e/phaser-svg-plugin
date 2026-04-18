@@ -1,8 +1,10 @@
 import type { GameObjects } from "phaser";
 import type { PathCommand, SVGStyle } from "./types.ts";
 export interface RenderOptions {
-    /** Points per curve segment for tessellation. */
+    /** Fixed points per curve segment for legacy tessellation control. */
     curveResolution?: number | undefined;
+    /** Maximum screen-space flattening error for adaptive tessellation. */
+    curveTolerance?: number | undefined;
 }
 /**
  * Render parsed SVG path commands onto a Phaser Graphics object.
@@ -38,7 +40,7 @@ export declare function signedArea2(points: ReadonlyArray<{
     y: number;
 }>): number;
 /**
- * Remove consecutive near-duplicate points that confuse earcut.
+ * Remove consecutive near-duplicate points that create degenerate geometry.
  * Also strips a duplicate closing vertex (last ≈ first).
  */
 export declare function deduplicatePoints<T extends {
