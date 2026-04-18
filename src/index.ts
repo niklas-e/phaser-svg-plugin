@@ -25,6 +25,7 @@ export {
   SVGSceneBatch,
   type SceneBatchDrawOptions,
   type SceneBatchPathOptions,
+  type SVGSceneBatchOptions,
 } from "./scene-batch.ts"
 export { convertShape, type ConvertedShape } from "./shape.ts"
 export { resolveStyle } from "./style.ts"

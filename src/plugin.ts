@@ -17,6 +17,7 @@ import {
   SVGSceneBatch,
   type SceneBatchDrawOptions,
   type SceneBatchPathOptions,
+  type SVGSceneBatchOptions,
 } from "./scene-batch.ts"
 import type { SVGStyle } from "./types.ts"
 
@@ -32,6 +33,7 @@ export {
   SVGSceneBatch,
   type SceneBatchDrawOptions,
   type SceneBatchPathOptions,
+  type SVGSceneBatchOptions,
   type SVGPathOptions,
   type SVGPluginOptions,
 }

@@ -249,6 +249,71 @@ describe("SVGSceneBatch", () => {
     })
   })
 
+  it("skips redraw in retained mode when queued state is unchanged", () => {
+    withFakeWebGL2Context(() => {
+      const graphics = new FakeGraphics()
+      const scene = createScene(graphics)
+      const batch = new SVGSceneBatch(scene, {
+        graphics: graphics as unknown as Phaser.GameObjects.Graphics,
+        autoFlush: false,
+        retained: true,
+      })
+
+      batch.queuePath("M 0 0 L 20 0 L 20 20 Z", { fill: 0xffffff })
+      const firstFlush = batch.flush()
+
+      const firstClearCalls = graphics.clearCalls
+      const firstTriangleCalls = graphics.fillTriangleCalls
+
+      batch.queuePath("M 0 0 L 20 0 L 20 20 Z", { fill: 0xffffff })
+      const secondFlush = batch.flush()
+
+      assert.equal(firstFlush, true)
+      assert.equal(secondFlush, false)
+      assert.equal(graphics.clearCalls, firstClearCalls)
+      assert.equal(graphics.fillTriangleCalls, firstTriangleCalls)
+    })
+  })
+
+  it("redraws in retained mode when queued state changes", () => {
+    withFakeWebGL2Context(() => {
+      const graphics = new FakeGraphics()
+      const scene = createScene(graphics)
+      const batch = new SVGSceneBatch(scene, {
+        graphics: graphics as unknown as Phaser.GameObjects.Graphics,
+        autoFlush: false,
+        retained: true,
+      })
+
+      batch.queuePath("M 0 0 L 20 0 L 20 20 Z", { fill: 0xffffff })
+      assert.equal(batch.flush(), true)
+
+      batch.queuePath("M 0 0 L 20 0 L 20 20 Z", { fill: 0xffffff }, { x: 8 })
+      assert.equal(batch.flush(), true)
+      assert.equal(graphics.clearCalls, 2)
+    })
+  })
+
+  it("markDirty forces redraw for retained mode", () => {
+    withFakeWebGL2Context(() => {
+      const graphics = new FakeGraphics()
+      const scene = createScene(graphics)
+      const batch = new SVGSceneBatch(scene, {
+        graphics: graphics as unknown as Phaser.GameObjects.Graphics,
+        autoFlush: false,
+        retained: true,
+      })
+
+      batch.queuePath("M 0 0 L 20 0 L 20 20 Z", { fill: 0xffffff })
+      assert.equal(batch.flush(), true)
+
+      batch.markDirty()
+      batch.queuePath("M 0 0 L 20 0 L 20 20 Z", { fill: 0xffffff })
+      assert.equal(batch.flush(), true)
+      assert.equal(graphics.clearCalls, 2)
+    })
+  })
+
   it("auto-flushes on postupdate event when enabled", () => {
     withFakeWebGL2Context(() => {
       const graphics = new FakeGraphics()

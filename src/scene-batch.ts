@@ -12,6 +12,11 @@ import type { SVGStyle, ViewBox } from "./types.ts"
 
 const SCENE_BATCH_COMPILED_CACHE_MAX_ENTRIES = 128
 const SCENE_BATCH_PATH_CACHE_MAX_ENTRIES = 256
+type ParsedPathCommands = ReturnType<typeof parsePath>
+
+const COMPILED_IDENTITY = new WeakMap<CompiledSVG, number>()
+const PATH_COMMANDS_IDENTITY = new WeakMap<ParsedPathCommands, number>()
+let nextIdentity = 1
 
 export interface SceneBatchDrawOptions extends RenderOptions {
   overrideFill?: number | undefined
@@ -29,6 +34,16 @@ export interface SceneBatchPathOptions extends RenderOptions {
   y?: number | undefined
 }
 
+export interface SVGSceneBatchOptions {
+  graphics?: GameObjects.Graphics | undefined
+  autoFlush?: boolean | undefined
+  /**
+   * Reuse the previously drawn frame when the queued scene-batch state
+   * is unchanged between flushes.
+   */
+  retained?: boolean | undefined
+}
+
 interface QueuedCompiledEntry {
   kind: "compiled"
   compiled: CompiledSVG
@@ -37,7 +52,7 @@ interface QueuedCompiledEntry {
 
 interface QueuedPathEntry {
   kind: "path"
-  commands: ReturnType<typeof parsePath>
+  commands: ParsedPathCommands
   style: SVGStyle
   options?: SceneBatchPathOptions | undefined
 }
@@ -81,23 +96,17 @@ export class SVGSceneBatch {
   private readonly scene: SceneLike
   private readonly graphics: GameObjects.Graphics
   private readonly autoFlush: boolean
+  private readonly retained: boolean
   private readonly queue: QueueEntry[] = []
   private readonly compiledSvgCache = new Map<string, CompiledSVG>()
-  private readonly parsedPathCache = new Map<
-    string,
-    ReturnType<typeof parsePath>
-  >()
+  private readonly parsedPathCache = new Map<string, ParsedPathCommands>()
+  private retainedStateKey: string | null = null
 
-  constructor(
-    scene: Phaser.Scene,
-    options?: {
-      graphics?: GameObjects.Graphics | undefined
-      autoFlush?: boolean | undefined
-    },
-  ) {
+  constructor(scene: Phaser.Scene, options?: SVGSceneBatchOptions | undefined) {
     this.scene = scene as unknown as SceneLike
     this.graphics = options?.graphics ?? this.scene.add.graphics()
     this.autoFlush = options?.autoFlush ?? true
+    this.retained = options?.retained ?? false
 
     if (this.autoFlush) {
       this.scene.sys.events.on("postupdate", this.flush)
@@ -141,6 +150,14 @@ export class SVGSceneBatch {
 
   flush = (): boolean => {
     if (this.queue.length === 0) {
+      return false
+    }
+
+    const nextStateKey = this.retained
+      ? this.computeQueueStateKey(this.queue)
+      : null
+    if (this.retained && nextStateKey === this.retainedStateKey) {
+      this.queue.length = 0
       return false
     }
 
@@ -230,7 +247,17 @@ export class SVGSceneBatch {
       requestedSamples,
     )
 
+    if (this.retained) {
+      this.retainedStateKey = nextStateKey
+    }
+
     return true
+  }
+
+  /** Force the next retained-mode flush to redraw queued content. */
+  markDirty(): this {
+    this.retainedStateKey = null
+    return this
   }
 
   destroy = (): void => {
@@ -238,6 +265,7 @@ export class SVGSceneBatch {
       this.scene.sys.events.off("postupdate", this.flush)
     }
     this.queue.length = 0
+    this.retainedStateKey = null
     this.compiledSvgCache.clear()
     this.parsedPathCache.clear()
   }
@@ -262,7 +290,7 @@ export class SVGSceneBatch {
     return compiled
   }
 
-  private getCachedPathCommands(d: string): ReturnType<typeof parsePath> {
+  private getCachedPathCommands(d: string): ParsedPathCommands {
     const cached = this.parsedPathCache.get(d)
     if (cached) {
       this.parsedPathCache.delete(d)
@@ -281,6 +309,37 @@ export class SVGSceneBatch {
     this.parsedPathCache.set(d, commands)
     return commands
   }
+
+  private computeQueueStateKey(entries: ReadonlyArray<QueueEntry>): string {
+    const parts: string[] = []
+
+    for (const entry of entries) {
+      if (entry.kind === "path") {
+        parts.push(this.pathEntryStateKey(entry))
+      } else {
+        parts.push(this.compiledEntryStateKey(entry))
+      }
+    }
+
+    return parts.join("||")
+  }
+
+  private pathEntryStateKey(entry: QueuedPathEntry): string {
+    return [
+      "path",
+      getIdentity(entry.commands, PATH_COMMANDS_IDENTITY),
+      styleStateKey(entry.style),
+      pathOptionsStateKey(entry.options),
+    ].join("|")
+  }
+
+  private compiledEntryStateKey(entry: QueuedCompiledEntry): string {
+    return [
+      "compiled",
+      getIdentity(entry.compiled, COMPILED_IDENTITY),
+      compiledOptionsStateKey(entry.compiled, entry.options),
+    ].join("|")
+  }
 }
 
 function resolveCompiledMsaaSamples(
@@ -292,6 +351,64 @@ function resolveCompiledMsaaSamples(
   }
 
   return compiled.msaaSamples ?? 2
+}
+
+function compiledOptionsStateKey(
+  compiled: CompiledSVG,
+  options: SceneBatchDrawOptions | undefined,
+): string {
+  return [
+    options?.x ?? 0,
+    options?.y ?? 0,
+    options?.width ?? "_",
+    options?.height ?? "_",
+    options?.curveResolution ?? "_",
+    options?.curveTolerance ?? "_",
+    resolveCompiledMsaaSamples(compiled, options),
+    options?.overrideFill ?? "_",
+    options?.overrideStroke ?? "_",
+  ].join("|")
+}
+
+function pathOptionsStateKey(
+  options: SceneBatchPathOptions | undefined,
+): string {
+  return [
+    options?.x ?? 0,
+    options?.y ?? 0,
+    options?.curveResolution ?? "_",
+    options?.curveTolerance ?? "_",
+    options?.msaaSamples ?? 2,
+  ].join("|")
+}
+
+function styleStateKey(style: SVGStyle): string {
+  return [
+    style.fill ?? "_",
+    style.fillAlpha,
+    style.stroke ?? "_",
+    style.strokeAlpha,
+    style.strokeWidth,
+    style.lineJoin,
+    style.lineCap,
+    style.miterLimit,
+    style.opacity,
+  ].join("|")
+}
+
+function getIdentity<T extends object>(
+  target: T,
+  map: WeakMap<T, number>,
+): number {
+  const existing = map.get(target)
+  if (existing !== undefined) {
+    return existing
+  }
+
+  const assigned = nextIdentity
+  nextIdentity += 1
+  map.set(target, assigned)
+  return assigned
 }
 
 function resolveStyleWithOverrides(
