@@ -210,7 +210,7 @@ function getBenchmarkRendererForMsaa(): BenchmarkRendererForMsaa {
   const canvas = document.createElement("canvas")
   const gl2 = assertDefined(
     canvas.getContext("webgl2") as WebGL2RenderingContext | null,
-    "Benchmark runner requires WebGL2 for default x4 MSAA",
+    "Benchmark runner requires WebGL2 for default x2 MSAA",
   )
 
   benchmarkRendererForMsaa = {
