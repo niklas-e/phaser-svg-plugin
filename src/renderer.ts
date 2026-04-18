@@ -44,6 +44,7 @@ const COMPOUND_FILL_CACHE = new WeakMap<
   }>,
   ReadonlyArray<number>
 >()
+const FILL_TRIANGLE_COMMAND_ID_CACHE = new WeakMap<object, number | null>()
 type JoinDecorationOp = { kind: "polygon"; points: ReadonlyArray<Point2D> }
 const LINE_JOIN_DECORATION_CACHE = new WeakMap<
   ReadonlyArray<Point2D>,
@@ -678,16 +679,7 @@ function fillCompoundPath(
 
   graphics.fillStyle(assertDefined(style.fill), fillAlpha)
 
-  for (let i = 0; i + 5 < triangles.length; i += 6) {
-    graphics.fillTriangle(
-      assertDefined(triangles[i]),
-      assertDefined(triangles[i + 1]),
-      assertDefined(triangles[i + 2]),
-      assertDefined(triangles[i + 3]),
-      assertDefined(triangles[i + 4]),
-      assertDefined(triangles[i + 5]),
-    )
-  }
+  fillTriangles(graphics, triangles)
 }
 
 function getCompoundFillTriangles(
@@ -1159,6 +1151,7 @@ function strokeWithTriangles(
   }
 
   const segmentCount = closed ? n : n - 1
+  const triangles: number[] = []
 
   for (let i = 0; i < segmentCount; i++) {
     const a = assertDefined(points[i])
@@ -1168,8 +1161,23 @@ function strokeWithTriangles(
       continue
     }
 
-    fillQuad(graphics, quad)
+    triangles.push(
+      quad[0].x,
+      quad[0].y,
+      quad[1].x,
+      quad[1].y,
+      quad[2].x,
+      quad[2].y,
+      quad[0].x,
+      quad[0].y,
+      quad[2].x,
+      quad[2].y,
+      quad[3].x,
+      quad[3].y,
+    )
   }
+
+  fillTriangles(graphics, triangles)
 }
 
 function computeStrokeQuad(
@@ -1195,14 +1203,6 @@ function computeStrokeQuad(
   ]
 }
 
-function fillQuad(
-  graphics: GameObjects.Graphics,
-  [a, b, c, d]: [Point2D, Point2D, Point2D, Point2D],
-): void {
-  graphics.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y)
-  graphics.fillTriangle(a.x, a.y, c.x, c.y, d.x, d.y)
-}
-
 function fillPolygon(
   graphics: GameObjects.Graphics,
   points: ReadonlyArray<Point2D>,
@@ -1215,12 +1215,15 @@ function fillPolygon(
   }
 
   const indices = earcut(vertices, [], 2)
+  const triangles: number[] = []
   for (let i = 0; i + 2 < indices.length; i += 3) {
     const a = assertDefined(points[assertDefined(indices[i])])
     const b = assertDefined(points[assertDefined(indices[i + 1])])
     const c = assertDefined(points[assertDefined(indices[i + 2])])
-    graphics.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y)
+    triangles.push(a.x, a.y, b.x, b.y, c.x, c.y)
   }
+
+  fillTriangles(graphics, triangles)
 }
 
 function createRoundJoinSector(
@@ -1289,6 +1292,108 @@ function shortestAngleDelta(from: number, to: number): number {
     delta += Math.PI * 2
   }
   return delta
+}
+
+function fillTriangles(
+  graphics: GameObjects.Graphics,
+  triangles: ReadonlyArray<number>,
+): void {
+  if (triangles.length === 0) {
+    return
+  }
+
+  if (submitTrianglesViaCommandBuffer(graphics, triangles)) {
+    return
+  }
+
+  for (let i = 0; i + 5 < triangles.length; i += 6) {
+    graphics.fillTriangle(
+      assertDefined(triangles[i]),
+      assertDefined(triangles[i + 1]),
+      assertDefined(triangles[i + 2]),
+      assertDefined(triangles[i + 3]),
+      assertDefined(triangles[i + 4]),
+      assertDefined(triangles[i + 5]),
+    )
+  }
+}
+
+function submitTrianglesViaCommandBuffer(
+  graphics: GameObjects.Graphics,
+  triangles: ReadonlyArray<number>,
+): boolean {
+  const graphicsWithBuffer = graphics as unknown as {
+    commandBuffer?: unknown
+    fillTriangle: (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      x2: number,
+      y2: number,
+    ) => unknown
+  }
+
+  const commandBuffer = graphicsWithBuffer.commandBuffer
+  if (!Array.isArray(commandBuffer)) {
+    return false
+  }
+
+  const commandId = resolveFillTriangleCommandId(graphicsWithBuffer)
+  if (commandId === null) {
+    return false
+  }
+
+  for (let i = 0; i + 5 < triangles.length; i += 6) {
+    commandBuffer.push(
+      commandId,
+      assertDefined(triangles[i]),
+      assertDefined(triangles[i + 1]),
+      assertDefined(triangles[i + 2]),
+      assertDefined(triangles[i + 3]),
+      assertDefined(triangles[i + 4]),
+      assertDefined(triangles[i + 5]),
+    )
+  }
+
+  return true
+}
+
+function resolveFillTriangleCommandId(graphicsWithBuffer: {
+  commandBuffer?: unknown
+  fillTriangle: (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+  ) => unknown
+}): number | null {
+  const cached = FILL_TRIANGLE_COMMAND_ID_CACHE.get(graphicsWithBuffer)
+  if (cached !== undefined) {
+    return cached
+  }
+
+  const commandBuffer = graphicsWithBuffer.commandBuffer
+  if (!Array.isArray(commandBuffer)) {
+    FILL_TRIANGLE_COMMAND_ID_CACHE.set(graphicsWithBuffer, null)
+    return null
+  }
+
+  const beforeLength = commandBuffer.length
+  graphicsWithBuffer.fillTriangle(0, 0, 0, 0, 0, 0)
+
+  const command =
+    commandBuffer.length >= beforeLength + 7
+      ? commandBuffer[beforeLength]
+      : undefined
+
+  commandBuffer.length = beforeLength
+
+  const resolved = typeof command === "number" ? command : null
+  FILL_TRIANGLE_COMMAND_ID_CACHE.set(graphicsWithBuffer, resolved)
+  return resolved
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -74,6 +74,23 @@ class SpyGraphics {
   }
 }
 
+class CommandBufferGraphics extends SpyGraphics {
+  commandBuffer: number[] = []
+
+  fillTriangle(
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+  ): this {
+    this.calls.fillTriangle += 1
+    this.commandBuffer.push(10, x0, y0, x1, y1, x2, y2)
+    return this
+  }
+}
+
 const OPEN_PATH: PathCommand[] = [
   { type: "M", x: 0, y: 0 },
   { type: "L", x: 10, y: 0 },
@@ -143,5 +160,26 @@ describe("renderPath fast paths", () => {
 
     assert.ok(graphics.calls.fillTriangle > 0)
     assert.equal(graphics.calls.fillCircle, 0)
+  })
+
+  it("coalesces triangle submission when commandBuffer is available", () => {
+    const graphics = new CommandBufferGraphics()
+    const style = makeStyle({
+      fill: 0xffffff,
+      fillAlpha: 1,
+    })
+    const closedSquare: PathCommand[] = [
+      { type: "M", x: 0, y: 0 },
+      { type: "L", x: 10, y: 0 },
+      { type: "L", x: 10, y: 10 },
+      { type: "L", x: 0, y: 10 },
+      { type: "Z" },
+    ]
+
+    renderPath(graphics as never, closedSquare, style)
+
+    // One probe call is used to resolve Phaser's fill-triangle command ID.
+    assert.equal(graphics.calls.fillTriangle, 1)
+    assert.ok(graphics.commandBuffer.length >= 14)
   })
 })
