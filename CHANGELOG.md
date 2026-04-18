@@ -7,6 +7,20 @@ This project is currently in alpha. During alpha, semver patch releases are inte
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Deprecated
+
+### Removed
+
+### Breaking
+
+## [0.2.0] - 2026-04-18
+
+### Added
 - `SVGSceneBatch` now caches repeated `queueSVG` compilation and `queuePath`
 	parsing inputs to reduce per-frame queue overhead.
 - `SVGSceneBatch` now supports optional retained-mode dirty skipping via
@@ -19,14 +33,6 @@ This project is currently in alpha. During alpha, semver patch releases are inte
 	lower JS overhead on heavy fill/stroke workloads.
 - Performance baseline guidance now includes 64-object immediate vs
 	scene-batch scenarios for batching regression tracking.
-
-### Fixed
-
-### Deprecated
-
-### Removed
-
-### Breaking
 
 ## [0.1.0] - 2026-04-06
 

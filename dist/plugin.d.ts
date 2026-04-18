@@ -1,9 +1,9 @@
 import { type GameObjects, Plugins } from "phaser";
 import type { CompiledSVG } from "./compiler.ts";
 import { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, type SVGPathOptions, drawSVG, drawSVGIfDirty, drawSVGPath, drawSVGPathIfDirty, markSVGDirty, type SVGPluginOptions } from "./draw.ts";
-import { SVGSceneBatch, type SceneBatchDrawOptions, type SceneBatchPathOptions } from "./scene-batch.ts";
+import { SVGSceneBatch, type SceneBatchDrawOptions, type SceneBatchPathOptions, type SVGSceneBatchOptions } from "./scene-batch.ts";
 import type { SVGStyle } from "./types.ts";
-export { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, drawSVG, drawSVGIfDirty, drawSVGPath, drawSVGPathIfDirty, markSVGDirty, SVGSceneBatch, type SceneBatchDrawOptions, type SceneBatchPathOptions, type SVGPathOptions, type SVGPluginOptions, };
+export { clearSVGDirtyState, drawCompiledSVG, drawCompiledSVGIfDirty, drawSVG, drawSVGIfDirty, drawSVGPath, drawSVGPathIfDirty, markSVGDirty, SVGSceneBatch, type SceneBatchDrawOptions, type SceneBatchPathOptions, type SVGSceneBatchOptions, type SVGPathOptions, type SVGPluginOptions, };
 /**
  * Phaser v4 Scene Plugin — adds `this.svg` to every Scene.
  *
